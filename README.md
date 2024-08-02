@@ -1,4 +1,4 @@
-### Brillian
+## Brillian
 
 Brillian is a project intended for beginning programmers and data professionals looking to learn **Data Management and Analytics** skills in a structured, hands-on manner. It has been designed to be as comprehensive as possible, without overwhelming the learner with too much information at once. 
 
