@@ -19,17 +19,25 @@
   ],
   "anchors": [
     {
-      "name": "Community",
-      "icon": "slack",
-      "url": "https://mintlify.com/community"
+      "name": "Sectors API",
+      "icon": "book",
+      "url": "https://docs.sectors.app"
     },
     {
       "name": "Blog",
       "icon": "newspaper",
-      "url": "https://mintlify.com/blog"
+      "url": "https://supertype.ai/notes"
     }
   ],
   "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "assignments"
+      ]
+    },
     {
       "group": "Enterprise Data Management",
       "pages": [
@@ -37,22 +45,13 @@
       ]
     },
     {
-      "group": "Get Started",
-      "pages": [
-        "introduction",
-        "quickstart",
-        "development"
-      ]
-    },
-    {
       "group": "Essentials",
       "pages": [
-        "essentials/markdown",
-        "essentials/code",
-        "essentials/images",
-        "essentials/settings",
-        "essentials/navigation",
-        "essentials/reusable-snippets"
+        "essentials/python-programming",
+        "essentials/sql",
+        "essentials/data-analysis",
+        "essentials/visualization",
+        "essentials/kafka"
       ]
     }
   ],
