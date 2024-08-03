@@ -1,6 +1,6 @@
 ---
-title: 'Effective EDM'
-description: 'Effective enterprise data management policies, practices, standards and governance'
+title: 'Overview: Enterprise Data Management'
+description: 'An overview of enterprise data management and its historical context'
 ---
 
 <Note>
@@ -144,7 +144,6 @@ multiple tables to reduce redundancy and improve data integrity. Normalization h
 duplication and inconsistencies by breaking down data into smaller, more manageable units, and establishing
 relationships between them.
 
-
 ```mermaid
 graph TD
     A[Customer Table] -->|CustomerID| B[Order Table]
@@ -163,6 +162,10 @@ graph TD
     B -.->|Foreign Key| G[CustomerID]
     C -.->|Foreign Key| H[ProductID]
 ```
+- Customer Table: Contains customer details with a primary key (CustomerID).
+- Order Table: Contains order details with primary keys (OrderID) and foreign keys (CustomerID, ProductID).
+- Product Table: Contains product details with a primary key (ProductID).
+- Relationships: The Customer Table is related to the Order Table via CustomerID, and the Order Table is related to the Product Table via ProductID.
 
 Denormalization is the process of combining normalized tables back into a single table to improve query
 performance and simplify data retrieval. Denormalization is often used in data warehousing and analytics
@@ -192,6 +195,9 @@ graph TD
     G -.->|Redundant Data| N[ProductName]
     H -.->|Redundant Data| O[ProductPrice]
 ```
+- Customer Order Product Table: Combines all relevant data into one table.
+- Data Columns: Includes CustomerID, OrderID, ProductID, and redundant data like CustomerName, OrderDate, ProductName, and ProductPrice.
+- Redundancy: Data is repeated for each row, which can lead to redundancy and potential anomalies.
 
 Common scenarios where denormalization is used include:
 - **Reporting and Analytics**: Denormalization can improve query performance by reducing the number of
@@ -204,9 +210,21 @@ Common scenarios where denormalization is used include:
   sources into a single table. This can simplify the migration process and reduce the complexity of data
   transformation tasks.
 
-## Modern Enterprise Data Management
-The following subsections provide an overview of the key components of enterprise data management, 
-and a brief history of how this function has evolved over the years.
+As computing power improved and data technology advanced, newer data management systems and paradigms such as 
+NoSQL databases, data lakes, and cloud-based data platforms emerged, with each offering specialized, unique capabilities 
+to address the evolving needs of modern organizations. Today, most organizations have some form of 
+heterogeneous data environment, with a mix of relational and non-relational databases, disbursed data sources,
+and a variety of data management tools and technologies to support their enterprise analytics needs.
 
-### Trivia: MySQL vs MariaDB
+### Summary 
+The historical context of enterprise data management provides valuable insights into the evolution of data
+management practices and technologies over time. From the centralized, monolithic systems of the past to the
+distributed, heterogeneous environments of today, the landscape of enterprise data management has undergone
+significant changes driven by advancements in technology, changing business requirements, and evolving data
+management paradigms. Importantly, this evolution has also served to show how current data management practices build
+upon many past lessons to better meet the needs of today's data-driven business environment.
+
+Over the next few sections, we will explore the key components of modern enterprise data management, including
+data governance, data quality, master data management, metadata management, and data integration, and discuss
+how these components work together to support the data-driven decision-making processes of organizations today.
 

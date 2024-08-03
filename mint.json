@@ -41,7 +41,8 @@
     {
       "group": "Enterprise Data Management",
       "pages": [
-        "enterprise-data-management/introduction"
+        "enterprise-data-management/historical",
+        "enterprise-data-management/edm"
       ]
     },
     {
