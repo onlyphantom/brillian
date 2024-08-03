@@ -42,7 +42,8 @@
       "group": "Enterprise Data Management",
       "pages": [
         "enterprise-data-management/historical",
-        "enterprise-data-management/edm"
+        "enterprise-data-management/edm",
+        "enterprise-data-management/exercise_erd"
       ]
     },
     {

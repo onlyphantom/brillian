@@ -1,0 +1,139 @@
+---
+title: 'Entity Relationship Diagrams'
+description: 'Exercise: Create an ERD for a loan management system'
+---
+
+<Note>
+  This chapter is constantly being updated by the analytics consultants at Supertype to stay current with the latest trends 
+  in enterprise data management. Please check back regularly for updates.
+</Note>
+
+## ERD for a Loan Management System
+Here is an example of an Entity Relationship Diagram (ERD) for a database schema of a financial institution. You 
+may use it as a base reference to create your own ERD for a loan management system.
+
+```mermaid
+erDiagram
+    CUSTOMER ||--o{ ACCOUNT : has
+    ACCOUNT ||--o{ TRANSACTION : generates
+    ACCOUNT ||--o{ PRODUCT : linked_with
+    CUSTOMER ||--o{ COMPLIANCE_REGULATORY : subject_to
+    CUSTOMER ||--o{ RISK_FRAUD : monitored_for
+    TRANSACTION ||--o{ FINANCIAL_DATA : includes
+    ACCOUNT ||--o{ OPERATIONAL_DATA : involves
+    INTEGRATION_DATA_SYNC ||--o{ CUSTOMER : synchronizes
+    INTEGRATION_DATA_SYNC ||--o{ ACCOUNT : synchronizes
+    DATA_SECURITY_PRIVACY ||--o{ CUSTOMER : protects
+    DATA_SECURITY_PRIVACY ||--o{ ACCOUNT : protects
+
+    CUSTOMER {
+        string customer_id PK
+        string first_name
+        string last_name
+        string middle_name
+        string address
+        string city
+        string state
+        string postal_code
+        string email
+        string phone_number
+        date date_of_birth
+        string nationality
+        string gender
+        string marital_status
+    }
+    ACCOUNT {
+        string account_id PK
+        string customer_id FK
+        string account_number
+        string account_type
+        float balance
+        date open_date
+        date close_date
+        string branch_code
+        string currency
+        string status
+        float interest_rate
+    }
+    TRANSACTION {
+        string transaction_id PK
+        string account_id FK
+        float amount
+        string transaction_type
+        date transaction_date
+        string description
+        string reference_number
+        string transaction_status
+    }
+    PRODUCT {
+        string product_id PK
+        string product_name
+        string product_type
+        float product_price
+        string currency
+        string description
+        date launch_date
+        string provider
+    }
+    COMPLIANCE_REGULATORY {
+        string compliance_id PK
+        string customer_id FK
+        string regulation_type
+        date compliance_date
+        string compliance_status
+        string document_reference
+        string notes
+    }
+    RISK_FRAUD {
+        string risk_id PK
+        string customer_id FK
+        string fraud_type
+        date detection_date
+        string risk_level
+        string description
+        string resolution_status
+        string report_reference
+    }
+    FINANCIAL_DATA {
+        string financial_id PK
+        string account_id FK
+        float total_income
+        float total_expenses
+        float net_worth
+        date report_date
+        string report_type
+        string currency
+        string notes
+    }
+    OPERATIONAL_DATA {
+        string operation_id PK
+        string account_id FK
+        string operation_type
+        date operation_date
+        string operation_status
+        string details
+        string responsible_person
+    }
+    INTEGRATION_DATA_SYNC {
+        string sync_id PK
+        string source_system
+        string target_system
+        string sync_type
+        date sync_date
+        string sync_status
+        string details
+    }
+    DATA_SECURITY_PRIVACY {
+        string security_id PK
+        string customer_id FK
+        string account_id FK
+        string policy_type
+        string policy_description
+        date policy_effective_date
+        string compliance_status
+        string incident_report
+    }
+
+```
+
+
