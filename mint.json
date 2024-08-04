@@ -19,14 +19,14 @@
   ],
   "anchors": [
     {
+      "name": "Google Classroom",
+      "icon": "graduation-cap",
+      "url": "https://classroom.google.com/c/NjgxMzk2ODU4ODc3?cjc=qeo3imy"
+    },
+    {
       "name": "Sectors API",
       "icon": "book",
       "url": "https://docs.sectors.app"
-    },
-    {
-      "name": "Blog",
-      "icon": "newspaper",
-      "url": "https://supertype.ai/notes"
     }
   ],
   "navigation": [
@@ -44,6 +44,12 @@
         "enterprise-data-management/historical",
         "enterprise-data-management/edm",
         "enterprise-data-management/exercise_erd"
+      ]
+    },
+    {
+      "group": "Financial Data Analysis",
+      "pages": [
+        "financial-data-analytics/api_programming_python"
       ]
     },
     {

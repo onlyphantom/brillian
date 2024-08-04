@@ -8,6 +8,20 @@ description: 'Course Structure and Setup'
 Congratulations on taking your first step towards becoming a brilliant data and analytics
 professional. 
 
+### Pre-requisites
+
+Estimated time: None to 30 minutes
+
+Before you get started, make sure you have the following installed on your machine with the 
+right privileges. If your machine is issued by your company, you may have to ask your IT
+department to grant you the necessary permissions and firewall access.
+
+- [ ] Install Python 3.7 or higher
+- [ ] Install Git
+- [ ] Install a code editor (I recommend Visual Studio Code, or VSCode for short)
+
+The Python courses will be taught using Python 3.7 or higher. For the most part, if you're
+using a version of Python that's slightly older, you should be fine. 
 
 ### Tooling and Setup
 
@@ -17,17 +31,8 @@ Estimated time: 45 minutes
     Throughout this learning path, you'll be asked to write code and develop solutions 
     to the problems presented. To help you with this, your instructors have developed 
     a set of materials that you can clone and use on your local machine. 
-    
-    To clone the repository locally, follow these
-    [instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-    in your terminal.
+  </Accordion>
 
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Run the first example">
-    Run the first example in the repository to ensure that your environment is set up
-    correctly. This will also help you get familiar with the codebase and the tools
-    you'll be using throughout the course.
-  </Accordion>
   <Accordion icon="key" title="Set up your environment variables">
     Throughout the course, you'll be working with a variety of tools and services. 
     To ensure that your code runs correctly, you'll need to set up environment variables 
@@ -37,27 +42,96 @@ Estimated time: 45 minutes
     point should you ever commit your environment variables to the repository or 
     use them in your code directly.
   </Accordion>
-</AccordionGroup>
-
-### Deploy your changes
-Estimated time: 1 Hour
-<AccordionGroup>
-  <Accordion icon="github" title="Clone the materials locally">
-    Throughout this learning path, you'll be asked to write code and develop solutions 
-    to the problems presented. To help you with this, your instructors have developed 
-    a set of materials that you can clone and use on your local machine. 
+    <Accordion icon="rectangle-terminal" title="Perform the exercises in setting up your Python environment">
+    Hop to the [following section](#python-programming-environment) to perform the exercises in setting up your Python environment.
     
-    To clone the repository locally, follow these
-    [instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-    in your terminal.
-
-  </Accordion>
-<Accordion icon="rectangle-terminal" title="Run the first example">
-    Run the first example in the repository to ensure that your environment is set up
-    correctly. This will also help you get familiar with the codebase and the tools
-    you'll be using throughout the course.
+    Successful completion of this section will ensure that you have the necessary tools and libraries installed to work with Python,
+    and that is a good starting point for the rest of the course. 
   </Accordion>
 </AccordionGroup>
+
+### Python programming environment
+To test that you have set up everything correctly, complete the following steps:
+
+Estimated time: 1 Hour
+<Steps>
+  <Step title="Pull external data into Python">
+    1. Use a command prompt or your Terminal to launch your command line interface, then `pip install requests` 
+      to install the Requests library.
+    2. Type `python` or `python3` to launch the Python interpreter.
+    3. Run the following code snippet to pull external data into Python:
+    ```python
+    import requests
+    response = requests.get('https://raw.githubusercontent.com/supertypeai/idx_total_historical_1995/main/market_cap_history.csv')
+    print(response.text)
+    ```   
+     <AccordionGroup>
+    <Accordion title="Troubleshooting">
+      If the `requests` library is installed correctly, this code should execute without errors, and `response.status_code` should return 200, which is the HTTP status code for a successful request. 
+    
+      If the requests library is not installed, Python will raise an ImportError, indicating that the requests module is not found.
+    </Accordion>
+    <Accordion title="Sample Output">
+      To verify that you've performed the example correctly, the output should resemble the following:
+      ```bash
+        year,currency,market_cap
+        1995,USD,66584940000
+        1996,USD,90997080000
+        1997,USD,29050020000
+        1998,USD,22077860000
+        ...
+        2023,USD,717936458435
+      ```
+    </Accordion>
+      <Accordion title="Applications">
+      Reading in data from external sources is a common task in data analysis and data science. By using the `requests` library, 
+      you can easily pull data from APIs, websites, and other online sources directly into Python for further analysis and processing.
+      
+      <Icon icon="question" /> **Did you know?**
+      The data you just pulled in the total historical market capitalization of the IDX (Indonesian Stock Exchange) from 1995 to 2023.
+      In fact, it is used in this visualization on a financial intelligence app we've built:
+        - [Indonesian Stock Market, Historical Size](https://sectors.app/why-indonesia-stock-market)
+    </Accordion>
+    </AccordionGroup>
+
+
+  </Step>
+  <Step title="Use Pandas and Matplotlib">
+    - `pandas` is a powerful data manipulation library that allows you to work with structured data in Python. 
+    - `matplotlib` is a plotting library that enables you to create visualizations from your data. We'll be using 
+    these libraries extensively throughout the Python data analysis courses.
+    
+    Install these two libraries by running `pip install pandas matplotlib` in your terminal. 
+    
+    Then, run the following code snippet to visualize the data you pulled in the previous step:
+    ```python
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
+    url = 'https://raw.githubusercontent.com/supertypeai/idx_total_historical_1995/main/market_cap_history.csv'
+    df = pd.read_csv(url)
+
+    df['market_cap'].plot()
+    plt.show()
+    ```
+    
+    <AccordionGroup>
+    <Accordion title="Troubleshooting">
+      - If the `pandas` and `matplotlib` are installed correctly, this code should execute without errors, and it will 
+      use the `matplotlib` library to plot the market capitalization data. Calling `plt.show()` will display the plot in a new window.
+
+      - If `pandas` or `matplotlib` is not installed, Python will raise an ImportError, 
+      indicating that the module is not found.
+    </Accordion>
+    <Accordion title="Sample Output">
+      <Frame>
+        ![](./images/singles/idx_market_cap_historical.png)
+      </Frame>
+    </Accordion>
+    </AccordionGroup>
+  </Step>
+</Steps>
+
 
 ## Practice your skills directly
 
