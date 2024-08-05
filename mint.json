@@ -49,7 +49,9 @@
     {
       "group": "Financial Data Analysis",
       "pages": [
-        "financial-data-analytics/api_programming_python"
+        "financial-data-analytics/api_programming_python",
+        "financial-data-analytics/pandas",
+        "financial-data-analytics/lab_pandas"
       ]
     },
     {
