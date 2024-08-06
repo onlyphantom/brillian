@@ -4,3 +4,7 @@ _*.py
 
 # ignore all .answer files
 *.answer
+
+# ignore tha large loan_new csv
+loan_new.csv
+loan.db

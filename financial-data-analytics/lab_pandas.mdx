@@ -36,6 +36,9 @@ of Indonesia banking institutions. This exercise is **worth 15 points**.
     Use the provided Google Colab template to complete the exercises and submit 
     them for grading (a total of 15 points).
   </Card>
+  <Card icon="graduation-cap" title="Google Classroom" href="https://classroom.google.com/c/NjgxMzk2ODU4ODc3?cjc=qeo3imy">
+    Head over to Google Classroom to submit your assignments and receive feedback.    
+</Card>
 </CardGroup>
 
 ## Financial Ratios for Value Investing
@@ -152,7 +155,7 @@ Once you have the data loaded, perform a series of exercises that are worth 15 p
 ### 2. Filtering Data
 1. **Objective**: Learn to filter data based on specific conditions
 2. **Task**: Write Python code to filter and display rows where the `pe` is greater than 15 
-and when `symbol` is equal to `BRIS.JK`
+and when `symbol` is equal to `BRIS.JK`. Name this new DataFrame `bris_high`.
 3. **Hint**: Use boolean indexing 
 
 ### 3. Calculate Average Values
@@ -164,8 +167,9 @@ and when `symbol` is equal to `BRIS.JK`
 1. **Objective**: Learn to sort data and reorder columns
 2. **Task**: Write Python code to sort the DataFrame by `ps` in descending order, then reorder the columns 
     so that `symbol` is the first column, `year`, `ps`, `pe`, and `pb`. Drop the `company_name` column.
-3. **Hint**: Use the `sort_values()` method, and `drop()` method to remove the `company_name` column. 
+3. **Hint**: Use the `sort_values()` method, and optionally `drop()` method to remove the `company_name` column. 
     Recall that in `sort_values`, you can specify the `ascending` parameter to `False` to sort in descending order.
+    You may also choose the `columns` parameter in the `reindex()` method to reorder the columns.
 
 ### 5. Grouping and Aggregating Data
 1. **Objective**: Learn to group data and perform aggregate operations
@@ -191,3 +195,199 @@ and when `symbol` is equal to `BRIS.JK`
   banks.groupby('year')[['pb','ps']].mean()
   ```
 </Tip>
+
+## Dive Deeper
+The data you've been provided with is not hand curated, but rather sourced from [Sectors Financial Data API](https://sectors.app). If you're 
+feeling adventurous, you can proceed along with this section that explains how 
+the data is being fetched from the API and subsequently processed into a csv file.
+
+These topics may feel a bit advanced, and you are not required to complete them for the lab. They are included here
+for those who have a personal interest in learning more about how the "data pipeline" works in the real world.
+
+### Nested Data Structures into DataFrames
+The data is fetched from the API using the `requests` library, as you have seen in your [Quick start](/quickstart#python-programming-environment) guide.
+
+```python
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SECTORS_API_KEY = os.getenv("SECTORS_API_KEY")
+
+headers = {"Authorization": SECTORS_API_KEY}
+
+def fetch_data(url):
+    """
+    Fetches the data from the specified URL and returns it as a JSON object.
+    We created this from the get_info function in the previous chapter (API programming)
+    """
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {"error": "An error occurred while fetching the data."}
+```
+
+To actually use `fetch_data` we need to specify a url. This can be constructed from 
+reading the correponding API documentation. For example, to fetch the historical P/E ratios of BBRI, one could do:
+
+```python
+import os
+import requests
+from dotenv import load_dotenv
+import pandas as pd
+
+load_dotenv()
+
+SECTORS_API_KEY = os.getenv("SECTORS_API_KEY")
+
+headers = {"Authorization": SECTORS_API_KEY}
+
+banks = ["BBRI", "BMRI", "BBCA", "BBNI", "BRIS"]
+base_url = "https://api.sectors.app/v1/company/report/"
+
+
+def fetch_data(url):
+    """
+    Fetches the data from the specified URL and returns it as a JSON object.
+    We created this from the get_info function in the previous chapter (API programming)
+    """
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {"error": "An error occurred while fetching the data."}
+
+def get_bbri_as_dataframe():
+    """
+    Fetches the historical P/E ratios of BBRI and returns it as a DataFrame
+    """
+    url = f"{base_url}BBRI/?sections=valuation"
+    # formed url is: https://api.sectors.app/v1/company/report/BBRI/?sections=valuation
+    response = fetch_data(url)
+
+    return pd.json_normalize(response['valuation']).T
+
+
+bbri = get_bbri_as_dataframe()
+```
+
+This looks like a great deal more code than what you've seen so far, but it's essentially the same concepts you've learned
+with the addition of `pd.json_normalize` to convert the JSON response into a DataFrame.
+
+Here's the output:
+
+```python
+print(bbri)
+
+# Output:
+                                                                       0
+# last_close_price                                                    4530
+# latest_close_date                                             2024-08-05
+# daily_close_change                                             -0.038217
+# forward_pe                                                     10.036112
+# price_cash_flow                                                 5.830954
+# enterprise_to_revenue                                               None
+# enterprise_to_ebitda                                                 0.0
+# peg_ratio                                                       0.353977
+# intrinsic_value                                              5389.036722
+# historical_valuation   [{'pb': 2.24404134373024, 'pe': 27.29647505919...}]
+```
+
+We'll find that the `historical_valuation` key contains the data we're interested in, and we can extract it using `pd.json_normalize`
+once we've used `.explode()` to expand out the list of dictionaries into separate rows.
+
+```python
+bbri.loc['historical_valuation'].explode().head()
+
+# Output:
+# 0    {'pb': 2.24404134373024, 'pe': 27.296475059198...}
+# 0    {'pb': 2.13579246128274, 'pe': 19.850197923222...}
+# 0    {'pb': 2.47654136988394, 'pe': 14.485235110546...}
+# 0    {'pb': 2.77373225214342, 'pe': 14.370068321441...}
+# 0    {'pb': 2.33110392317047, 'pe': 11.406607296663...}
+# Name: historical_valuation, dtype: object
+```
+
+Seeing that it is now an object, we can then use `pd.json_normalize` to expand the dictionary into separate columns:
+
+```python
+pd.json_normalize(bbri.loc['historical_valuation'].explode())
+
+# Output:
+#          pb         pe        ps  year  pb_peer_avg  pe_peer_avg  ps_peer_avg
+# 0  2.244041  27.296475  3.908120  2020     1.262425    27.296475     6.378919
+# 1  2.135792  19.850198  4.025992  2021     1.466306    15.014559     6.374056
+# 2  2.476541  14.485235  4.406139  2022     1.008524    15.129255     4.343578
+# 3  2.773732  14.370068  5.187770  2023     0.832330    14.072334     3.899448
+# 4  2.331104  11.406607  3.817545  2024     0.781849    13.367830     3.457184
+```
+
+That is the essence of how we fetch data from an API endpoint that sometimes, 
+as in this case, returns nested data structures. 
+
+- `json_normalize`: Converts JSON data into a DataFrame
+- `explode`: Expands out a list of dictionaries into separate rows
+
+We perform the above iteratively for each bank in the `banks` list, and then concatenate the DataFrames together to form the final dataset.
+
+<Accordion title="Show full code">
+
+```python
+banks = ["BBRI", "BMRI", "BBCA", "BBNI", "BRIS"]
+
+
+def create_df(banks, save_to_csv=False, file_name="indonesia_banks.csv"):
+    """
+    Creates a DataFrame by fetching data from the API for each bank in the list.
+
+    Parameters:
+    - banks: List of bank identifiers.
+    - save_to_csv: Boolean flag to indicate if the DataFrame should be saved to a CSV file.
+    - csv_file_name: Name of the CSV file to save the DataFrame (default is "data.csv").
+
+    Returns:
+    - DataFrame with valuation data from banks of Indonesia
+    """
+    df_list = []
+
+    for bank in banks:
+        url = f"{base_url}{bank}/?sections=valuation"
+        response = fetch_data(url)
+
+        if "error" not in response:
+            df = pd.json_normalize(response)
+            if "valuation.historical_valuation" in df.columns:
+                historical_df = pd.json_normalize(
+                    df["valuation.historical_valuation"].explode()
+                )
+                historical_df["symbol"] = df["symbol"][0]
+                historical_df["company_name"] = df["company_name"][0]
+                historical_df = historical_df[
+                    ["symbol", "company_name", "year", "pe", "pb", "ps"]
+                ]
+            df_list.append(historical_df)
+        else:
+            print(f"Error fetching data for {bank}")
+
+    if not df_list:
+        joined = pd.DataFrame()
+    else:
+        joined = pd.concat(df_list, ignore_index=True)
+
+    if save_to_csv:
+        joined.to_csv(file_name, index=False)
+        print(f"Data saved to {file_name}")
+    return joined
+
+
+df = create_df(banks, save_to_csv=True, file_name="datasets/indonesia_banks_050824.csv")
+```
+
+</Accordion>
