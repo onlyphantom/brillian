@@ -55,6 +55,14 @@
       ]
     },
     {
+      "group": "Data Visualization",
+      "pages": [
+        "data-visualization/introduction",
+        "data-visualization/data_viz_fundamental",
+        "data-visualization/tools"
+      ]
+    },
+    {
       "group": "Essentials",
       "pages": [
         "essentials/python-programming",
