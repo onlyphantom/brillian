@@ -591,27 +591,6 @@ recommended time for the graded quiz is 45 minutes, but feel free to take as muc
 
 </Accordion>
 
-### Answer:
-
-```python
-# 1. Take the first 10 rows of the DataFrame, what is the median of the 'market_cap_change_billion' column?
-df.head(10)['market_cap_change_billion'].median()
-
-# 2. What is the year where IDX has increased the most in terms of market capitalization?
-max_change_year = df['market_cap_change_%'].idxmax()
-
-# 3. In how many years did IDX experience a market cap change that is lower than -50%? 
-num_neg_50 = df[df['market_cap_change_%'] < -0.5].shape[0]
-
-# 4. Taking only the 5 years between 2019 to 2023 (inclusive of both), at what rate did 
-# the market capitalization of IDX grow on average?
-df.loc[2019:2023]['market_cap_change_%'].mean() 
- 
-# 5. Grouped by the 'change_direction' column, what is the median 
-# market capitalization change in billion USD for each group?
-df.groupby('change_direction')['market_cap_change_billion'].median()
-```
-
 ## Author
 This chapter is written by [Samuel Chan](https://www.linkedin.com/in/chansamuel/), an analytics consultant at Supertype with 
 over 11 years of experience of enterprise AI consulting across Singapore, China (DianDian, 600634:SH), Japan (TWP Dai Nippon, TYO:7912; gumi Inc, TWO:3903; SEGA, TYO:6460) 

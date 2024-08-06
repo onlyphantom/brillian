@@ -28,10 +28,166 @@ of Indonesia banking institutions. This exercise is **worth 15 points**.
     Review the Pandas tutorial to familiarize yourself with the library and its
     capabilities.
   </Card>
+  <Card
+    title="Submission Template (Google Colab)"
+    icon="dumbbell"
+    href="https://colab.research.google.com/drive/1Mx7iK6aH8ohvfFDRapS0H1jzXbVIY2uO?usp=sharing"
+  >
+    Use the provided Google Colab template to complete the exercises and submit 
+    them for grading (a total of 15 points).
+  </Card>
 </CardGroup>
 
-## Background: Value Investing Ratios 
+## Financial Ratios for Value Investing
+When it comes to investing, the specific style of "value investing" popularized by Benjamin Graham
+and Warren Buffet is based on the idea of buying stocks that are undervalued relative to their intrinsic value.
+
+One way to determine if a stock is undervalued is to look at a company's financial ratios. These ratios can help
+investors understand how a company is performing financially and whether its stock is a good investment. 
+
+In particular, We'll be looking at the Price-to-Earnings ratio, the Price-to-Book ratio, and the Price-to-Sales ratio.
 
 
+$$\text{P/E Ratio} = \frac{\text{Price per share}}{\text{Earnings per share}}$$
+- Where the Price per share is the current stock price, 
+- and Earnings per share is the company's net income divided by the number of shares outstanding.
 
-## 
+In a way, this measures how much investors are willing to pay for each dollar of earnings a company generates.
+
+$$\text{P/B Ratio} = \frac{\text{Price per share}}{\text{Book value per share}}$$
+- Where the Price per share is the current stock price,
+- and the Book value per share is the company's total assets minus its total liabilities, divided by the number of shares outstanding.
+
+The P/B ratio reflects the value that investors are willing to pay for each dollar of book value.
+
+$$\text{P/S Ratio} = \frac{\text{Price per share}}{\text{Sales per share}}$$
+- Where the Price per share is the current stock price,
+- and the Sales per share is the company's total revenue divided by the number of shares outstanding.
+
+The P/S ratio is particularly useful for companies that have negative earnings or are in the growth phase, as it measures how much investors are willing to pay for each dollar of sales.
+
+### Margin of Safety
+In value investing, a lower ratio is generally considered better, as it indicates that the stock is undervalued relative to its financial performance.
+When a stock is trading at a higher P/E or P/B ratio relative to its peers, value investors may typically consider 
+it overvalued -- this is where the concept of "margin of safety" comes into play. Magin of safety is simply 
+the difference between the intrinsic value of a stock and its market price, and a stock with a higher 
+P/E value is considered to have a lower margin of safety, unless its growth rate is significantly higher than its peers.
+
+In the following exercise, you will be working with data directly from a [financial data API](https://docs.sectors.app) to extract 
+the historical financial ratios of Indonesia's leading banking institutions. 
+
+The data would look like this:
+
+```csv
+symbol,company_name,year,pe,pb,ps
+BBRI.JK,PT Bank Rakyat Indonesia (Persero) Tbk,2020,27.296475059198,2.24404134373024,3.90812024342799
+BBRI.JK,PT Bank Rakyat Indonesia (Persero) Tbk,2021,19.8501979232225,2.13579246128274,4.02599153256836
+BBRI.JK,PT Bank Rakyat Indonesia (Persero) Tbk,2022,14.4852351105461,2.47654136988394,4.40613876244184
+BBRI.JK,PT Bank Rakyat Indonesia (Persero) Tbk,2023,14.3700683214413,2.77373225214342,5.18776985111159
+BBRI.JK,PT Bank Rakyat Indonesia (Persero) Tbk,2024,11.8598506535486,2.42373070867358,3.96923623135049
+BMRI.JK,PT Bank Mandiri (Persero) Tbk,2020,17.3942521554938,1.54302128039226,3.05224667300517
+BMRI.JK,PT Bank Mandiri (Persero) Tbk,2021,11.5796062923157,1.58561909266445,2.91227616355148
+BMRI.JK,PT Bank Mandiri (Persero) Tbk,2022,11.1374278712277,1.99641859827664,3.62397928851202
+BMRI.JK,PT Bank Mandiri (Persero) Tbk,2023,11.6603200287564,2.46122688658584,5.20968178447345
+...
+```
+
+By comparing the historical P/E ratios of different banks to their peers and their own historical 
+averages, an analyst can get a sense of whether a bank is trading at a premium or discount to its intrinsic value, 
+and whether it is a good value investment relative to its historical norm. 
+
+<AccordionGroup>
+  <Accordion title="Benchmarking Current Valuation">
+  Historical P/E ratios provide a benchmark for evaluating a stock's current valuation. By comparing the current P/E ratio to its historical averages, investors can gauge whether the stock is trading above or below its historical norm.
+    - High Current P/E Relative to Historical P/E: If the current P/E ratio is significantly higher than its historical average, it may indicate that the stock is overvalued relative to its past valuation. This could suggest a reduced margin of safety, as the stock price may be less protected against future declines.
+    - Low Current P/E Relative to Historical P/E: Conversely, a lower current P/E ratio compared to historical averages may suggest undervaluation. This can indicate a higher margin of safety, as the stock is trading at a lower multiple of earnings than in the past, potentially providing a buffer against adverse developments. 
+  </Accordion>
+    <Accordion title="Assessing Growth Expectations">
+    Historical P/E ratios reflect market expectations and sentiment over time. By analyzing historical trends, investors can understand whether the current P/E ratio aligns with growth expectations.
+      - Consistent Historical P/E: If the historical P/E ratio has been consistent and the current P/E is significantly higher, it might imply that market expectations for growth are unusually high. If these expectations are not met, the stock price could suffer, reducing the margin of safety.
+      - Changing Historical P/E: If the historical P/E ratio has fluctuated widely, it may reflect the company's volatility or changes in its growth prospects. Comparing the current P/E ratio to this range helps investors assess whether the stock's current valuation is reasonable given its historical performance and market conditions.
+    </Accordion>
+    <Accordion title="Evaluating Market Cycles">
+    Historical P/E ratios can provide insights into market cycles and valuation extremes. By understanding where the current P/E ratio falls within these cycles, investors can better evaluate the margin of safety.
+     - High Market Cycles: During market bubbles or periods of irrational exuberance, P/E ratios tend to be elevated. A current P/E ratio at the high end of historical extremes might signal that the stock is overvalued, indicating a lower margin of safety.
+      - Low Market Cycles: Conversely, during market downturns or periods of pessimism, P/E ratios may be depressed. A current P/E ratio at the low end of historical ranges could suggest undervaluation, providing a higher margin of safety.
+
+    Since the data provides the historical P/E values of Indonesia's leading banking institutions, you will be
+     able to aggregate these values to form an overall picture of the investment sentiment of the 
+     banking sector across the last few years. 
+    </Accordion>
+</AccordionGroup>
+
+With the right data and analysis tools, a data analyst can construct a comprehensive picture of the banking sector's valuation, and estimate 
+a reasonable range for a stock's intrinsic value. If the current P/E ratio is at the lower end of its historical range 
+and the company's growth prospects are as strong as ever, it may indicate a good value investment opportunity with a high margin of safety.
+
+## Banking Institutions' historical valuation
+For your convenience, a copy of the dataset has been provided in the `datasets` folder. Using 
+what you've learned in the Pandas tutorial, you should know how to read this data into a DataFrame:
+
+```python
+import pandas as pd
+
+banks = pd.read_csv('datasets/indonesia_banks_050824.csv')
+banks.tail()
+
+# Output:
+#      symbol                   company_name  year         pe        pb        ps
+# 18  BRIS.JK  PT Bank Syariah Indonesia Tbk  2020  10.082970  1.014481  1.557497
+# 19  BRIS.JK  PT Bank Syariah Indonesia Tbk  2021  23.934311  2.897505  4.622312
+# 20  BRIS.JK  PT Bank Syariah Indonesia Tbk  2022  13.843540  1.760183  3.226628
+# 21  BRIS.JK  PT Bank Syariah Indonesia Tbk  2023  14.072334  2.071936  4.287817
+# 22  BRIS.JK  PT Bank Syariah Indonesia Tbk  2024  18.897257  2.752647  5.756971
+```
+
+Once you have the data loaded, perform a series of exercises that are worth 15 points in total.
+
+### 1. Basic Data Exploration
+1. **Objective**: Learn to explore the basic structure of a DataFrame
+2. **Task**: Write Python code to import the dataset and display the first 5 rows 
+    of the DataFrame. Then, report its shape (number of rows and columns).
+3. **Hint**: Use the `head()` method and the `shape` attribute. 
+
+### 2. Filtering Data
+1. **Objective**: Learn to filter data based on specific conditions
+2. **Task**: Write Python code to filter and display rows where the `pe` is greater than 15 
+and when `symbol` is equal to `BRIS.JK`
+3. **Hint**: Use boolean indexing 
+
+### 3. Calculate Average Values
+1. **Objective**: Learn to compute statistical summaries on a DataFrame
+2. **Task**: Write Python code to calculate the median `pe`, `pb`, and `ps` values for the year 2022.
+3. **Hint**: Use the `median()` method after filtering the DataFrame for the year 2022.
+
+### 4. Sort Data, Reorder and Drop Columns
+1. **Objective**: Learn to sort data and reorder columns
+2. **Task**: Write Python code to sort the DataFrame by `ps` in descending order, then reorder the columns 
+    so that `symbol` is the first column, `year`, `ps`, `pe`, and `pb`. Drop the `company_name` column.
+3. **Hint**: Use the `sort_values()` method, and `drop()` method to remove the `company_name` column. 
+    Recall that in `sort_values`, you can specify the `ascending` parameter to `False` to sort in descending order.
+
+### 5. Grouping and Aggregating Data
+1. **Objective**: Learn to group data and perform aggregate operations
+2. **Task**: Write Python code to group the bank valuation data by `symbol` and 
+  calculate the average `pe`, `pb`, and `ps` values for each group. Display the results.
+  Now, do the same but grouped by `year` and calculate the average `pe`, `pb`, and `ps` values for each year.
+3. **Hint**: Use the `groupby()` method followed by the `mean(numeric_only=True)` method.
+
+<Tip>
+  In past versions of `pandas`, the `mean()` method would include all numeric columns by default.
+  There is now a `FutureWarning` that suggests `numeric_only` defaulting to `False` in the future. 
+
+  We can either specify `numeric_only=True` to avoid the warning, or use the `select_dtypes()` method to filter
+  out only the numeric columns before calling the `mean()` method.
+
+  ```python
+  banks
+    .select_dtypes(include='number')
+    .groupby('year')
+    .mean()
+
+  # alternatively, explicitly specify through a list:
+  banks.groupby('year')[['pb','ps']].mean()
+  ```
+</Tip>
