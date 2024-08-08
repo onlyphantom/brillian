@@ -40,12 +40,13 @@ that setup to be able to follow along with the lessons.
 
 ### Grading Rubric 
 - [ ] [Convert a CSV to a SQLite Database](#recommended-pre-reading), 4 points
-- [ ] SQL Queries in Practice, 11 points
+- [ ] SQL Queries in Practice, 12 points
     1. Renaming columns with `ALTER TABLE`, 1 point
     1. `SELECT`, `LIMIT` and `OFFSET` in queries, 1 point
     1. Returning unique values with `DISTINCT`, 1 point
     1. Filtering data with `WHERE`, 1 point
     1. Pattern matching with `LIKE`, 1 point
+    1. Joining tables with `LEFT JOIN`, 1 point
     1. Aggregation and grouping with `GROUP BY`, 1 point
     1. Using `CAST AS` to change data types, 1 point
     1. Using `HAVING TO` to filter grouped data, 1 point
@@ -53,5 +54,426 @@ that setup to be able to follow along with the lessons.
     1. Using `BETWEEN` to filter data within a range, 1 point
     1. Using `CREATE VIEW` to pack a query into a named object, 1 point
 
-## Database queries with Pandas
+<Tip>
+  For the most part, you will also need a database client to interact with your database. These ranged from 
+  full fledged workbenches, to simple command line tools. I am using the `SQLite` VSCode 
+  extension by alexcvzz, which suffice for the purpose of this module.
+</Tip>
 
+## Connecting to a Database
+Very often, to make a connection to a database, you will need to provide a connection string and 
+use a library to help with the connection. Among the most popular choices for Python users would be 
+`sqlalchemy` ([additional lessons to SQLAlchemy](https://github.com/onlyphantom/sqlalchemy-tutorial)) 
+which acts as an Object Relational Mapper (ORM), but there are also libraries specific to the database:
+
+- PostgreSQL: `psycopg2`
+- MySQL: `mysql-connector-python` or `mysqlclient`
+
+In addition to an ORM or an adapter library, you would also need to prepare the connection details
+for the database. This would include the database name, the user, the password, and the host. 
+
+Depending on the tools you use, I've provided a list of examples below to help you make the first 
+connection to a database and perform a simple query.
+
+<AccordionGroup>
+  <Accordion title="Using pandas">
+    ```python
+    import pandas as pd
+
+    # Create a connection to the database
+    conn = sqlite3.connect('mydatabase.db')
+    # or conn = psycopg2.connect("dbname=mydatabase user=postgres password=xxxxx")
+    # or conn = mysql.connector.connect(user='root', password='xxxxx', host='localhost', database='mydatabase')
+
+    # Read a table from the database into a DataFrame
+    df = pd.read_sql_query("SELECT * FROM mytable LIMIT 10", conn)
+    ```
+  </Accordion>
+
+  <Accordion title="Using sqlalchemy">
+    ```python
+    from sqlalchemy import create_engine
+
+    engine = create_engine('sqlite:///mydatabase.db')
+    # or engine = create_engine('postgresql://postgres:xxxxx@localhost/mydatabase')
+    # or engine = create_engine('mysql+mysqlconnector://root:xxxxx@localhost/mydatabase')
+
+    connection = engine.connect()
+    result = connection.execute("SELECT * FROM mytable LIMIT 10")
+    for row in result:
+        print(row)
+    connection.close()
+    ```
+  </Accordion>
+    <Accordion title="Using psycopg2">
+    ```python
+    import psycopg2
+
+    dbname = 'your_database_name'
+    user = 'your_username'
+    password = 'your_password'
+    host = 'your_host'
+    port = 'your_port'
+
+    # Create a connection to the PostgreSQL database
+    conn = psycopg2.connect(
+        dbname=dbname,
+        user=user,
+        password=password,
+        host=host,
+        port=port
+    )
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM mytable LIMIT 10;")
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+    cur.close()
+    conn.close()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Database queries with Pandas
+SQL stands for Structured Query Language, and is a domain-specific language used in programming and designed for managing data held in a relational database management system (RDBMS).
+
+<Card icon="notebook" title="Notebook Exercise" href="https://github.com/onlyphantom/dataanalysis/blob/master/4_SQL_Query.ipynb">
+  Looking for some structured practice with using SQL directly in Pandas? 
+
+  Try your hands on the exercises in [4_SQL_Query](https://github.com/onlyphantom/dataanalysis/blob/master/4_SQL_Query.ipynb) before moving into 
+  the lab exercises below.
+</Card>
+
+## <Icon icon="flask"/> Lab 
+All of the following exercise is to be performed on the `sqlite` database you created from the CSV files:
+
+- `metadata` table: from `idx_subsector_metadata_080824.csv`
+- `reports` table: from `idx_sector_reports_080824.csv`
+- the database itself should be called `sectors.db`
+
+Your submission should be a folder with all the SQL files you created for each exercise.
+
+### Renaming columns with `ALTER TABLE` and `RENAME COLUMN`
+
+Let's start off simple. Create a file and name it `01_rename.sql`. Use `ALTER TABLE <table_name> RENAME COLUMN <existing_name> TO <new_name>` to make alterations to the column in `metadata`
+named `sub_sector_id`. Rename it to `sub_sector_uid`.  
+
+<Tip>
+  If you use the VSCode extension, you can also run the query directly to verify that 
+  your answer is correct.
+
+  1. CTRL + SHIFT + P to open the command palette
+  2. Type `SQLite: New Query`
+  3. Type in your query
+  4. CTRL + SHIFT + P + `SQLite: Run Query` or use the shortcut (CTRL + SHIFT + Q)
+
+  You may need to refresh your database view to see this change take effect. Alternatively, you can 
+  also use `PRAGMA table_info(metadata);` to see the column names.
+</Tip>
+
+### `SELECT`, `LIMIT` and `OFFSET` in queries
+
+Now create a second file and call it `02_select.sql`. 
+
+Use `SELECT` to query the `reports` table and return the first 10 rows with the following columns:
+- `sub_sector`
+- `total_companies`
+- `filtered_median_pe`
+
+Add an `OFFSET` clause to your query to get the first 10 rows after the first 5 rows (skipping the first 5 rows).
+
+```sql
+SELECT _, _, _
+FROM reports
+LIMIT _
+OFFSET _;
+```
+
+### Return unique values with `DISTINCT` and `as` aliasing 
+
+Create a third file and name it `03_distinct.sql`.
+
+Use `SELECT` to query the `metadata` table and return the first 10 unique sectors in the table.
+
+Add a `DISTINCT` clause to your query to return only unique values in the 
+`sector` column. This will remove any duplicate values from the result set.
+
+Name the column `Indonesian Sectors` using the `AS` keyword.
+
+```sql
+SELECT column AS column_name
+# or:
+SELECT column AS "column name"
+```
+
+Use a `LIMIT` clause to return only the first 10 rows.
+
+### Filtering data with `WHERE`
+
+Create a fourth file and name it `04_where.sql`.
+
+From the `reports` table, select only rows where the sub-sector has 
+at least 15 companies and the average market cap of that sector (`avg_market_cap`) is lesser than 500_000_000_000 ("500 billion").
+
+Return the following columns:
+- `sub_sector`
+- `total_companies`
+- `avg_market_cap`
+
+You can join multiple conditions using the `AND` keyword.
+
+```sql
+SELECT _, _, _
+FROM _
+WHERE _ >= _ AND _ < _;
+```
+
+### Pattern matching with `LIKE`.
+
+Create a fifth file and name it `05_like.sql`.
+
+In SQL, you can use wildcards for constructing patterns. 
+
+- `%` wildcard matches any sequence of zero or more characters.
+- `_` wildcard matches any single character.
+- `b%` matches `bank`, `bytes`, `bit`
+- `%ion` matches `institution`, `renovation`
+- `%it% matches any string containing `it`
+
+- `b_nk` matches `bank`, `bunk`
+- `l__n` matches `loan`, `lean`
+
+"A" LIKE "a" is true (non case sensitive). To set it to 
+case sensitive, run `PRAGMA case_sensitive_like = true`;
+
+Select all rows from the `metadata` table where the `sub_sector` column contains the word `Goods` or `Services` (both case insensitive), 
+regardless of the position of these words in the string.
+
+Return all columns.
+
+```sql
+SELECT * 
+FROM __
+WHERE sub_sector LIKE '__' OR sub_sector LIKE '__';
+```
+
+### Joining tables with `LEFT JOIN`
+Create a sixth file and name it `06_left_join.sql`.
+
+Use a `LEFT JOIN` to join the `metadata` and `reports` tables on the `sub_sector` column.
+
+Return the following columns:
+- `sector`
+- `sub_sector`
+- `total_companies`
+- `avg_market_cap`
+
+```sql
+SELECT _, m.sub_sector, _, _
+FROM metadata AS m
+LEFT JOIN reports AS r
+ON _ = _;
+```
+
+### Aggregation and grouping with `GROUP BY`
+
+Create a seventh file and name it `07_group_by.sql`. 
+
+This file should contain two queries.
+
+For the first query, use `COUNT` to return the number of rows in each group 
+of `sector` in the `metadata` table. This gives us an idea of how many sub sectors
+are in each sector.
+
+Name the columns `sector` and `total_sub_sectors`.
+```sql
+SELECT _, COUNT(*) as _
+FROM _
+GROUP BY _;
+```
+
+For the second query, use `AVG` to return the average number of companies of each sub sector by 
+grouping on the `sector` column.
+
+Name the columns `sector`, `sub_sector`, `total_companies`, and `avg_sub_sector_companies`.
+
+This query should be similar to the one in your `LEFT JOIN` exercise 
+since you will need to join the two tables to get the `total_companies` column.
+
+```sql
+SELECT sector, AVG(total_companies) AS _
+FROM _
+LEFT JOIN _
+ON _
+GROUP BY sector;
+```
+
+### Using `CAST AS` and `ORDER BY`
+Since aggregation is commonly applied on numeric columns, this may present a little bit of problem when our columns are in character strings. You may alter the database table and change the column types, or you may use `CAST AS` to cast the column values from character to either `integer` or `decimal`.
+
+Create an eighth file and name it `08_cast_as.sql`.
+
+Use `CAST AS` to change the `total_companies` and `avg_market_cap` columns in the `reports` table to an integer.
+Finally, use `ORDER BY` to sort the result set by the `total_companies` column in descending order. Return 
+only the first ten rows and the following columns:
+- `sub_sector`
+- `total_companies` as companies_num
+- `avg_market_cap` as market_cap_average
+
+```sql
+SELECT _, 
+  CAST(_) AS _, 
+  CAST(AS integer) AS _
+FROM reports
+ORDER BY _ DESC
+LIMIT _;
+```
+
+For practice's sake, you should also try this exercise without 
+changing the column types and see if you can get the same result 
+when ordering by a character column. 
+
+If you get the following results, you did not cast the columns correctly:
+
+```plaintext
+|sub_sector|total_companies|avg_market_cap|
+|---|---|---|
+|sub_sector_1|97|1000000000|
+|sub_sector_2|92|500000000|
+|sub_sector_3|9|250000000|
+|sub_sector_4|85|100000000|
+```
+
+### Using `HAVING TO` to filter grouped data
+`HAVING` has to be used with `GROUP BY`. They act similarly to how `WHERE` works on rows, except `HAVING` filters on the group levels.
+
+Create a ninth file and name it `09_having.sql`.
+
+Perform the second exercise in the seventh file again, but this 
+time return only sectors where the `avg_sub_sector_companies` is greater than 30.
+
+### Use a subquery to nest a `SELECT` under another
+
+Subqueries allow you to put together more complex queries while maintaining some readability. Fundamentally, a subquery is just a nested level of `SELECT` statement. 
+
+Create a tenth file and name it `10_subquery.sql`.
+
+First create a subquery that returns all rows from `metadata` where the sector is either `Financials` or `Technology` (case-sensitive!). 
+
+Then use this subquery to filter the `reports` table, so the returned set 
+only contains rows where the `sub_sector` is in the (earlier) subquery result.
+
+Return the following columns in your query:
+- `sub_sector`
+- `min_company_pe`
+- `max_company_pe`
+
+```sql
+SELECT sub_sector, min_company_pe, max_company_pe
+FROM _
+WHERE _ IN (
+    SELECT sub_sector 
+    FROM _
+    WHERE _ IN ('_', '_')
+)
+```
+
+### Using `BETWEEN` to filter data within a range
+
+Create a eleventh file and name it `11_between.sql`.
+
+Your query should be similar to the one in the tenth file above, 
+with a small adjustment. 
+
+- In your subquery (the inner query), return all rows from `metadata` where the `sector` is either `Financials` or `Infrastructures` and when the `sub_sector_uid` is between 3 and 20. 
+- In your outer query, return only rows where the `avg_yoy_q_revenue_growth` is between 0 and 0.3.
+
+Note that `BETWEEN` is inclusive on both ends, so `BETWEEN 0 AND 17` includes 0 and 17.
+
+Return the following columns:
+- `sub_sector`
+- `avg_yoy_q_revenue_growth`
+- `min_company_pe`
+- `max_company_pe`
+
+Notice that:
+- If you have performed the exercises earlier, your column names may have be altered. We're working with the 
+`sub_sector_uid` column after the renaming exercise.
+- `BETWEEN`, as you'd expect, expect two values separated by `AND` and that these are 
+numbers or dates. You might have to cast the column to a number if it's not already.
+
+```sql
+SELECT sub_sector, avg_yoy_q_revenue_growth, min_company_pe, max_company_pe
+FROM _ 
+WHERE _ IN (
+    SELECT _ 
+    FROM _
+    WHERE _ IN ('Financials', 'Infrastructures')
+    AND _ BETWEEN _ AND _
+) AND avg_yoy_q_revenue_growth BETWEEN _;
+```
+
+### Using `CREATE VIEW` to pack a query into a named object
+For the final exercise, create a file and name it `12_create_view.sql`.
+
+A view is the result set of a stored query. It is a virtual table you define
+in the database that can be queried like a table, except that it 
+does not store data. 
+
+Once you have defined a view, you can query it like a table -- it can include 
+columns from any number of tables, involving complex joins, filters and 
+aggregations. 
+
+We create a view with the `CREATE VIEW` statement.
+
+```sql
+CREATE VIEW view_name AS
+  SELECT column1, column2, ...
+  FROM table_name
+  WHERE condition;
+```
+
+In your file, create a view named `watchlist` from `reports` where the following conditions are met:
+- `avg_market_cap` is greater than the average of `avg_market_cap`. This means we're only watching 
+sectors with companies that are generally larger than the average.
+- `avg_yoy_q_revenue_growth` is greater than 0.1. This narrow our watchlist to sectors with companies 
+that are growing at a rate of at least 10% year-on-year.
+- `median_yield_ttm` greater than 0.03. This further narrows our watchlist to sectors with companies
+that are, on average, paying out at least 3% worth of dividiend yield.
+
+Return all columns. You may need to perform type casting to ensure
+that the columns are of the correct type.
+
+```sql
+CREATE VIEW watchlist AS
+SELECT *
+FROM reports
+-- complete the query here
+-- ... 
+```
+
+Now, use `PRAGMA` to print out the columns of the `watchlist` view.
+
+```sql
+PRAGMA table_info(watchlist);
+```
+
+Depending on your database editor or application, you may need to refresh the explorer to see your views being created.
+
+You can now attempt a query directly on this view to see if it works as expected.
+
+```sql
+SELECT * FROM watchlist LIMIT 10;
+```
+
+
+#### Benefits and Advantages of Views
+Views present the following benefits:
+- Simplify complex queries: Views can encapsulate complex queries and present a simplified, more understandable interface. Users can query the view without needing to know the details of the underlying tables and joins.
+- Data security: Views can restrict access to sensitive data. By creating views that only include certain columns or rows, you can control what data users see and access.
+- Consistency: Views ensure consistent results for complex queries. If you have a commonly used query, encapsulating it in a view ensures that any changes to the query logic are applied uniformly across all users and applications accessing that view.
+- Abstraction: Views abstract the underlying database schema. If the schema changes, you can often adjust the view without modifying the application code that uses the view.
+- Maintainaibility: If you need to update how data is presented or aggregated, you can modify the view definition without changing the application code that uses it.
+- Materialized views: Some databases support materialized views, which store the results of the view query in a table-like structure. This can improve query performance by pre-computing the results and storing them for faster access. In cases where 
+materialized view isn't supported, you can create a table from the view. It is important to distinguish this from regular views, which are 
+virtual and are generally just queries that are run when the view is queried.

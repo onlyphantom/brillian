@@ -1,0 +1,34 @@
+sector,sub_sector,slug,sub_sector_id
+Financials,Banks,banks,19
+Financials,Insurance,insurance,4
+Consumer Non-Cyclicals,Tobacco,tobacco,3
+Energy,"Oil, Gas & Coal",oil-gas-coal,18
+Technology,Technology Hardware & Equipment,technology-hardware-equipment,31
+Transportation & Logistic,Transportation,transportation,33
+Healthcare,Pharmaceuticals & Health Care Research,pharmaceuticals-health-care-research,24
+Consumer Cyclicals,Consumer Services,consumer-services,11
+Consumer Non-Cyclicals,Food & Staples Retailing,food-staples-retailing,15
+Infrastructures,Transportation Infrastructure,transportation-infrastructure,28
+Consumer Cyclicals,Media & Entertainment,media-entertainment,13
+Consumer Non-Cyclicals,Nondurable Household Products,nondurable-household-products,16
+Infrastructures,Utilities,utilities,29
+Financials,Holding & Investment Companies,holding-investment-companies,21
+Infrastructures,Telecommunication,telecommunication,6
+Transportation & Logistic,Logistics & Deliveries,logistics-deliveries,32
+Industrials,Industrial Services,industrial-services,25
+Consumer Cyclicals,Leisure Goods,leisure-goods,12
+Industrials,Multi-sector Holdings,multi-sector-holdings,26
+Consumer Cyclicals,Retailing,retailing,14
+Basic Materials,Basic Materials,basic-materials,8
+Healthcare,Healthcare Equipment & Providers,healthcare-equipment-providers,23
+Energy,Alternative Energy,alternative-energy,17
+Infrastructures,Heavy Constructions & Civil Engineering,heavy-constructions-civil-engineering,27
+Financials,Investment Service,investment-service,22
+Consumer Non-Cyclicals,Food & Beverage,food-beverage,2
+Consumer Cyclicals,Household Goods,household-goods,1
+Industrials,Industrial Goods,industrial-goods,5
+Financials,Financing Service,financing-service,20
+Consumer Cyclicals,Apparel & Luxury Goods,apparel-luxury-goods,9
+Technology,Software & IT Services,software-it-services,30
+Consumer Cyclicals,Automobiles & Components,automobiles-components,10
+Properties & Real Estate,Properties & Real Estate,properties-real-estate,7

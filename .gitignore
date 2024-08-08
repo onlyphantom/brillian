@@ -3,7 +3,7 @@ _*.py
 .env
 
 # ignore all .answer files
-*.answer
+*.answer.md
 
 # ignore tha large loan_new csv
 loan_new.csv
