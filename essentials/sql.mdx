@@ -1,37 +1,57 @@
 ---
 title: 'SQL and Databases'
-description: 'Display inline code and code blocks'
+description: 'The theoretical and practical aspects of database management and querying.'
 icon: 'database'
 ---
 
-## Basic
+## Recommended Pre-Reading
 
-### Inline Code
+<CardGroup cols={2}>
+  <Card
+    title="A historical perspective on enterprise data management"
+    icon="note"
+    href="/enterprise-data-management/historical"
+  >
+    A great way to learn about the evolution of enterprise data management and how
+    it has shaped the relational database management systems we use today.
+  </Card>
+    <Card
+    title="Creating SQLite Databases from CSV Files"    
+    icon="book"
+    href="https://github.com/onlyphantom/python4bankers/blob/main/instructions/CSV_to_SQLITE.md"
+  >
+    A 30-min, step-by-step guide to creating SQLite databases from CSV files.
+  </Card>
+</CardGroup>
 
-To denote a `word` or `phrase` as code, enclose it in backticks (`).
+## Introduction
 
-```
-To denote a `word` or `phrase` as code, enclose it in backticks (`).
-```
+Much of the data we work with in the financial industry is stored in databases and accessed using SQL. 
 
-### Code Block
+To really unlock the power of data, your ability and general familiarity with SQL will be a huge 
+advantage in your career, and is the reason why it's often a requirement for many data-related roles.
 
-Use [fenced code blocks](https://www.markdownguide.org/extended-syntax/#fenced-code-blocks) by enclosing code in three backticks and follow the leading ticks with the programming language of your snippet to get syntax highlighting. Optionally, you can also write the name of your code after the programming language.
+This module will cover the theoretical and practical aspects of database management and the querying language SQL.
+If you do not have a database connection set up (as is expected for most learners and beginners), the best alternative is to use SQLite, which is a lightweight database engine that can be used without a server.
 
-```java HelloWorld.java
-class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}
-```
+Follow the instructions in the [Recommended Pre-Reading](#recommended-pre-reading) section above to set up a SQLite database from a CSV file.
+If you're following this module as part of a course, you will be required to complete 
+that setup to be able to follow along with the lessons.
 
-````md
-```java HelloWorld.java
-class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}
-```
-````
+### Grading Rubric 
+- [ ] [Convert a CSV to a SQLite Database](#recommended-pre-reading), 4 points
+- [ ] SQL Queries in Practice, 11 points
+    1. Renaming columns with `ALTER TABLE`, 1 point
+    1. `SELECT`, `LIMIT` and `OFFSET` in queries, 1 point
+    1. Returning unique values with `DISTINCT`, 1 point
+    1. Filtering data with `WHERE`, 1 point
+    1. Pattern matching with `LIKE`, 1 point
+    1. Aggregation and grouping with `GROUP BY`, 1 point
+    1. Using `CAST AS` to change data types, 1 point
+    1. Using `HAVING TO` to filter grouped data, 1 point
+    1. Using subquery to nest a `SELECT` under another `SELECT`, 1 point
+    1. Using `BETWEEN` to filter data within a range, 1 point
+    1. Using `CREATE VIEW` to pack a query into a named object, 1 point
+
+## Database queries with Pandas
+
