@@ -57,9 +57,9 @@
     {
       "group": "Data Visualization",
       "pages": [
-        "data-visualization/introduction",
-        "data-visualization/data_viz_fundamental",
-        "data-visualization/tools",
+        "data-visualization/dv_introduction",
+        "data-visualization/dv_fundamental",
+        "data-visualization/dv_tools",
         "data-visualization/lab_tableau_public"
       ]
     },
