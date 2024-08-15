@@ -68,6 +68,7 @@
       "pages": [
         "essentials/python-programming",
         "essentials/sql",
+        "essentials/visualization",
         "essentials/kafka"
       ]
     }
