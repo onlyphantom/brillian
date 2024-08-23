@@ -64,6 +64,13 @@
       ]
     },
     {
+      "group": "Final Project",
+      "pages": [
+        "final-project/django-route",
+        "final-project/financial-ai-route"
+      ]
+    },
+    {
       "group": "Essentials",
       "pages": [
         "essentials/python-programming",
