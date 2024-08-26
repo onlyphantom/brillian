@@ -64,6 +64,13 @@
       ]
     },
     {
+      "group": "Apache Kafka and Redis",
+      "pages": [
+        "kafka-redis/nosql",
+        "kafka-redis/lab_drf_redis"
+      ]
+    },
+    {
       "group": "Essentials",
       "pages": [
         "essentials/python-programming",
