@@ -1,5 +1,5 @@
 # ignore all .py files that being with "_"
-_*.py
+# _*.py
 .env
 
 # ignore all .answer files
