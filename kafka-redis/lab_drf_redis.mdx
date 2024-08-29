@@ -1,0 +1,566 @@
+---
+title: 'Lab: Redis for API Caching'
+description: 'Build a simple API using Django Rest Framework, and use Redis for caching.'
+icon: flask
+---
+
+<Note>
+To complete this exercise, you will need to use Django Rest Framework to create several endpoints, and correctly implement caching using Redis. 
+This exercise is **worth 12 points**. 
+</Note>
+
+## Pre-Lab Preparation & Prerequisites
+<CardGroup cols={2}>
+  <Card icon="database" title="PostgreSQL" href="https://www.enterprisedb.com/downloads/postgres-postgresql-downloads">
+    Install PostgreSQL on your machine.
+  </Card>
+  <Card icon="gears" title="Docker" href="https://docs.docker.com/get-started/get-docker/">
+    Install Docker on your machine, follow the guides depending on the OS your device is running.
+  </Card>
+  <Card icon="youtube" title="Docker Fundamentals" href="https://youtu.be/ZlLwDN9_Gwg?si=7J0cZzeRMvLkfNYU">
+    You will need to have a basic understanding of Docker, especially on Docker Compose.
+  </Card>
+  <Card icon="code" title="Django Rest Framework" href="https://www.django-rest-framework.org/">
+    Basic understanding of Django and Django Rest Framework.    
+  </Card>
+</CardGroup>
+
+## Lab overview
+
+Caching is an essential technique for optimizing the performance of web applications by storing copies of frequently accessed data in memory. 
+As we have explored in the previous section, Redis is a popular in-memory data store that can be used with Django Rest Framework (DRF) to cache responses.
+In this tutorial, we’ll explore how to integrate Redis for caching in a DRF project that interacts with an existing database.
+
+## Setting Up a PostgreSQL database
+
+Assuming you have successfully installed PostgreSQL, we are now going to set up our own PostgreSQL database on our local machine.
+I have already prepared a [SQLite database dump](https://github.com/onlyphantom/brillian/blob/main/datasets/sectors_bri.sql) in the form of a `.sql` file, and an 
+additional [data](https://github.com/onlyphantom/brillian/blob/main/datasets/institutions_080824.csv) in the form of a `csv` file. To convert from SQLite to a PostgreSQL database, 
+follow these steps.
+
+1. **Review the SQLite `.sql` File**
+
+    The SQLite .sql file typically contains SQL commands to recreate the database schema and insert data. 
+    However, SQLite and PostgreSQL have some differences in SQL syntax, so the file might need adjustments.
+
+    Common differences to look for:
+
+    1. **Type Differences**: SQLite uses types like `INTEGER`, `TEXT`, `BLOB`, `REAL`, and `NUMERIC`. PostgreSQL has more specific types like `SERIAL`, `BOOLEAN`, and `VARCHAR`. 
+      Replace SQLite types with the corresponding PostgreSQL types where necessary.
+    2. **Auto-Increment**: SQLite uses `AUTOINCREMENT` with `INTEGER PRIMARY KEY`. In PostgreSQL, use `SERIAL` or `BIGSERIAL`.
+    3. **Date/Time Handling**: Ensure that any date/time types are compatible with PostgreSQL, which prefers `TIMESTAMP` or `DATE`.
+    4. **Boolean Values**: SQLite represents True/False as `1`/`0`. PostgreSQL uses `TRUE`/`FALSE` or `t`/`f`.
+    5. **Quotes and Escapes**: PostgreSQL is stricter about quotes around identifiers and strings. Use double quotes for identifiers and single quotes for strings.
+
+2. **Modify the SQLite .sql File for PostgreSQL Compatibility**
+
+    Before importing the .sql file into PostgreSQL, you typically need to make some modifications. Open the file in a text editor (I'd recommend Visual Studio Code) 
+    to check if there are any modifications you need to do based on point (1). Our .sql file only consists of TEXT data types and both tables have no primary key for demo purpose.
+    This means we don't need to change anything. 
+
+    Common changes:
+
+    1. **Replace `AUTOINCREMENT`**:
+        ```SQL
+        -- Original SQLite SQL
+        customer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        -- Replace with PostgreSQL equivalent
+        customer_id SERIAL PRIMARY KEY,
+        ```
+
+    2. **Adjust boolean values**:
+        ```SQL
+        -- SQLite
+        is_active INTEGER DEFAULT 1,
+
+        -- PostgreSQL
+        is_active BOOLEAN DEFAULT TRUE,
+        ```
+
+3. **Create the PostgreSQL Database**
+    Create a new empty database in PostgreSQL and then import/run the modified .sql file:
+
+    ```bash
+    psql -U postgres
+    Password for user postgres: <postgres_user>
+
+    CREATE DATABASE sectors_lite;
+
+    psql -U postgres sectors_lite < sectors_bri.sql
+    ```
+
+    If the file imports successfully, your data and schema should now be available in PostgreSQL.
+
+In some cases, depending on the complexity of your database, after successfully migrating and creating your PostgreSQL database you should also need to handle additional 
+adjustments and checks. For example, ensure that your foreign keys are correctly set up, and also check if the sequences for `SERIAL` columns are correctly configured.
+To view your database, you can also use [TablePlus](https://tableplus.com/) or [DBeaver](https://dbeaver.io/).
+
+## Start a Redis Database Server
+
+<Note>
+  You can also use docker run to pull directly a Redis image and run the container. However, I personally prefer using Docker Compose, letting us to add more services along 
+  the way as needed.
+</Note>
+
+On your project directory, create a `docker-compose.yml` file. Paste the following content:
+
+```yaml docker-compose.yml
+version: '1'
+
+services:
+  redis:
+    image: redis:7.4.0
+    container_name: redis
+    ports:
+    - "16379:6379"
+    volumes:
+    - redis_data:/data
+
+volumes:
+  redis_data:
+```
+You can use port `6379` for your own local machine. I just happen to have the port used for another Redis server, thus the reason on why I had to use port 16379.
+
+After saving the file, we are now to ready to start the container! Run it in detached mode using `-d` flag to let it run in background of your terminal.
+
+```bash
+docker compose up -d
+```
+Once it says that the container has started, we can now verify that our Redis Server has started and is ready to accept connections.
+
+```bash
+docker exec -it redis redis-cli
+```
+The above line tells our redis container to run `redis-cli` on its terminal. Let's send a `PING`!
+
+```
+127.0.0.1:6379> PING
+PONG
+```
+
+It's working as intended and we can now proceed with starting up our Django Rest Framework project.
+
+## Django Rest Framework
+
+Before we dive into developing our API endpoints and caching, let's set up the necessary environment for Django Rest Framework.
+
+### Install Packages
+
+```bash
+pip install django djangorestframework django-redis psycopg2
+```
+or you can also add a `requirements.txt` with the following:
+
+```txt requirements.txt
+Django==4.2.7
+psycopg2==2.9.9
+django-redis==5.4.0
+djangorestframework==3.14.0
+```
+and then run:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Start a Django Project
+
+Start a Django project. You can change the name of the `project` and `apps`.
+
+```bash
+django-admin startproject intro_drf
+cd intro_drf
+python manage.py startapp api
+```
+
+### Configure Django Settings
+In your `settings.py`, add the following configurations to set up our Django application.
+
+#### Add Apps
+
+```python settings.py
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework", # For DRF
+    "api" # For the api app we added
+]
+```
+
+#### Database
+
+Change the values for these depending on your own database configuration:
+
+```python settings.py
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "sectors_lite",
+        "USER": "postgres",
+        "PASSWORD": "postgres",
+        "HOST": "localhost",
+        "PORT": "5432"
+    }
+}
+```
+
+#### Cache Backend
+```python settings.py
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:16379/1",
+    }
+}
+```
+
+#### Renderer
+[Renderer](https://www.django-rest-framework.org/api-guide/renderers/) determines what kind of media types will be used on your returned responses. 
+There are multiple built-in renderers which you can use in Django Rest Framework. In this project, we only need to return our response as a JSON, and we can specify default renderers 
+globally in settings.
+
+```python settings.py
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer", ),
+}
+```
+
+### Django Models
+
+In Django, models are typically used to define the structure of your database tables. 
+When you create a model in Django, by default, Django assumes it should manage the table's schema -- meaning it will create, modify, and delete tables in the database according to the model definitions through migrations.
+
+However, in some cases, you might need to interact with a database that has been created outside of Django, 
+where the tables already exist and are managed by another system. This is common in situations where you’re integrating Django with legacy systems or databases managed by other applications. 
+In these scenarios, you don't want Django to alter the existing schema but still want to leverage Django's ORM to interact with the data.
+You can achieve this by setting the `managed` option to `False` in the model's `Meta` class. This tells Django that the table is already managed outside of Django’s ORM, 
+and Django should only use this model for querying, inserting, updating, or deleting data in the table, without trying to apply any schema changes.
+
+One of the shortcut to infer the schema of tables from your connected database is by running the following command:
+
+```bash
+python manage.py inspectdb > target_file.py
+```
+
+This command will scan through your tables and try to infer the correct schemas. The result should look like this:
+
+```python
+# This is an auto-generated Django model module.
+# You'll have to do the following manually to clean this up:
+#   * Rearrange models' order
+#   * Make sure each model has one field with primary_key=True
+#   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
+#   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
+# Feel free to rename the models, but don't rename db_table values or field names.
+from django.db import models
+
+
+class Institutions(models.Model):
+    symbol = models.TextField(blank=True, null=True)
+    updated_on = models.TextField(blank=True, null=True)
+    net_transaction = models.IntegerField(blank=True, null=True)
+    top_sellers = models.JSONField(blank=True, null=True)
+    date = models.TextField(blank=True, null=True)
+    top_buyers = models.JSONField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'institutions'
+
+
+class Metadata(models.Model):
+    sector = models.TextField(blank=True, null=True)
+    sub_sector = models.TextField(blank=True, null=True)
+    slug = models.TextField(blank=True, null=True)
+    sub_sector_id = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'metadata'
+
+
+class Reports(models.Model):
+    sub_sector = models.TextField(blank=True, null=True)
+    total_companies = models.TextField(blank=True, null=True)
+    total_market_cap = models.TextField(blank=True, null=True)
+    avg_market_cap = models.TextField(blank=True, null=True)
+    filtered_median_pe = models.TextField(blank=True, null=True)
+    filtered_weighted_avg_pe = models.TextField(blank=True, null=True)
+    min_company_pe = models.TextField(blank=True, null=True)
+    max_company_pe = models.TextField(blank=True, null=True)
+    avg_yoy_q_earnings_growth = models.TextField(blank=True, null=True)
+    avg_yoy_q_revenue_growth = models.TextField(blank=True, null=True)
+    weighted_max_drawdown = models.TextField(blank=True, null=True)
+    weighted_rsd_close = models.TextField(blank=True, null=True)
+    median_yield_ttm = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'reports'
+```
+
+You should not directly copy and paste this result into your models.py file. Instead, as the disclaimer at the top of the file suggests, 
+you should carefully check if the resulting schema is correct, and, more importantly, ensure that each model has a single primary key. 
+Here, you can see that none of the models have a column designated as the primary key. This requires a slight adjustment; 
+otherwise, you will encounter errors when performing operations using Django's ORM. By default, Django assumes each model has an id field as its primary key. 
+However, since none of the tables have that field, it will result in a SELECT error.
+
+#### 1. Applying Schema Changes (1 points)
+1. **Objective**: Learn to correctly declare schemas in Django models.
+2. **Task**: Identify which column should be the primary key, and assign the argument `primary_key=True`
+3. **Hint**: Each model should have 1 unique primary key.
+
+After you have assigned the correct primary key and schema, you can now copy this into `api/models.py`.
+
+### Django Serializers
+
+In Django Rest Framework (DRF), [serializers](https://www.django-rest-framework.org/api-guide/serializers/) play a crucial role in transforming complex data types, such as Django models, 
+into JSON (or other content types) that can be easily rendered into API responses. Serializers can also be configured to control which fields are being returned, given that some 
+columns might not be necessary, thus reducing the payload size.
+Conversely, serializers also handle deserialization, converting parsed data back into complex types, which can be validated and saved to the database. 
+This bidirectional capability makes serializers a fundamental part of DRF, especially when building APIs that interact with complex data structures.
+
+Starter example would look like this:
+
+```python serializers.py
+from rest_framework import serializers
+from .models import *
+
+class InstituionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Institutions
+        fields = '__all__'
+```
+#### 2. Adding Serializers (1 points)
+1. **Objective**: Learn to define and add serializers as needed.
+2. **Task**: Add serializers for the remaining models, while carefully considering the necessary fields you wish to include.
+
+### Django Views
+
+#### Institutional Trading on Stock Market
+
+Institutional trading refers to the buying and selling of large quantities of securities by institutions such as banks, mutual funds, pension funds, hedge funds, insurance companies, and other financial entities. 
+These trades are conducted on behalf of clients or for the institution’s own portfolio, and they play a significant role in the overall functioning and liquidity of the stock market.
+
+Understanding institutional trading offers retail traders a significant edge in navigating the complexities of the stock market. 
+By gaining insights into the behavior of large players, retail traders can better align their strategies, manage risks more effectively, 
+and make more informed trading decisions. While retail traders may not have the resources that institutions do, leveraging knowledge of institutional trading can help level the playing field, enhancing overall trading success.
+This method is often described as `following smart money`.
+
+Based on this, let's create a view which returns a list of companies and the associated institutional trading data. Since we are not allowing the users to post, update, or delete our data, we can use 
+the class `ListAPIView` which only allows `GET` method.
+
+```python views.py
+class InstitutionsView(ListAPIView):
+    queryset = Institutions.objects.all()
+    serializer_class = InstitutionsSerializer
+```
+
+`ListAPIView` is a class-based view provided by Django Rest Framework that is specifically designed to handle GET requests for listing a queryset of objects. 
+It is a powerful tool for building API endpoints because it simplifies the process of creating read-only endpoints that return a collection of model instances, typically in JSON format.
+
+- **queryset**: Defines the set of `Institutions` objects that should be retrieved from the database.
+- **serializer_class**: Specifies the serializer to be used for converting the `Institutions` objects into JSON.
+
+In short, `InstitutionsView` will automatically handle GET requests to list all instances of `Institutions`, serialized with `InstitutionsSerializer`.
+
+That was easy, right? It took us just 3 lines of codes and we're basically done. However, it would be nice if we can improve this by adding the capabilities to filter our query by a specific 
+institution name. This will be helpful if we want to follow a certain institution, i.e: Eastspring Investments. We can do this by overriding our queryset.
+
+```python
+def get_queryset(self):
+    queryset = super().get_queryset()
+    institution_name = self.request.query_params.get('name', None)
+    if institution_name:
+        queryset = queryset.filter(top_sellers__contains=[{'name': institution_name}])
+    return queryset
+```
+
+Here, we're telling our view to accept an optional query parameter `name`. If it's provided, we return only the companies which have the given institution as one of its top sellers.
+Notice that since `top_sellers` is a `JSONField` (originally a list of JSONB in our database schema), Django ORM supports querying the field based on a specific key-value, just like you learned in the previous chapter.
+
+### Django URLs
+
+In Django, URLs play a critical role in mapping web requests to the appropriate views. The URL configuration, typically defined in a `urls.py` file, serves as a roadmap that directs users' requests to the corresponding views in your application.
+
+Each Django project contains a `urls.py` file in its main project directory. This file defines the URL patterns that route requests to the correct views. Additionally, each app within the project can have its own `urls.py` file to handle app-specific URLs.
+
+1. **Project `urls.py`**:
+    ```python
+    from django.urls import path, include
+
+    urlpatterns = [
+        path('api/', include('api.urls')),
+    ]
+    ```
+
+2. **App `urls.py` (api/urls.py)**:
+    ```python
+    from .views import InstitutionsView
+
+    urlpatterns = [
+        path('get-institution-trade', InstitutionsView.as_view(), name='get-institution-trade'),
+    ]
+    ```
+
+Putting everything together, we can now start our Django server and verify that our view is working as intended.
+
+```bash
+python manage.py runserver
+```
+
+Open up your Postman or any tools to send a request to our endpoint:
+```bash
+http://127.0.0.1:8000/api/get-institution-trade?name=PT Eastspring Investment Indonesia
+
+[
+    {
+        "symbol": "SILO.JK",
+        "updated_on": "2024-01-21 16:55:09+00",
+        "net_transaction": 134800,
+        "top_sellers": null,
+        "date": "2023-12-31",
+        "top_buyers": [
+            {
+                "name": "Eastspring Investments (Singapore) Ltd",
+                "changeAmount": 94200
+            },
+            {
+                "name": "PT Eastspring Investment Indonesia",
+                "changeAmount": 40600
+            }
+        ]
+    },
+    ...,
+]
+```
+Verify how the query filter is doing its job, where it only returns companies with PT Eastspring Investment Indonesia as one of the top sellers. 
+For every request, it takes me around 300-500 ms. If you say that this is relatively fast, I would probably agree with you. This request doesn't even take half a second. But what if I tell you that 
+we can optimize this even further? Yes, `caching` is the final touch of this lab.
+
+### Caching
+
+Django has a high level function or built-in decorator that handles caching for your view: 
+```python
+from django.views.decorators.cache import cache_page
+```
+
+Instead of using the `cache_page` decorator, which caches entire views for a specified period, I’m going to demonstrate how to use Django’s low-level cache API. 
+The low-level cache function gives you granular control over which parts of your data should be cached. 
+This approach offers greater flexibility, allowing you to cache specific parts of your application as needed, rather than entire views or pages.
+
+Let's overwrite the `list` function.
+
+```python
+def list(self, request):
+    cache_key = 'institution-trade'  # Define a unique cache key for this data
+    result = cache.get(cache_key)  # Attempt to retrieve cached data using the cache key
+    
+    if not result:  # If no cache is found
+        print('Hitting DB')  # Log to indicate a database query is being made
+        result = self.get_queryset()  # Query the database for the data
+        print(result.values())  # Log the retrieved data (for debugging purposes)
+        
+        # Optional: Adjust the data before caching (e.g., filtering or transforming)
+        # result = result.values_list('symbol')
+        
+        cache.set(cache_key, result, 60)  # Cache the result for 60 seconds
+    else:
+        print('Cache retrieved!')  # Log to indicate that cached data was retrieved
+    
+    # Serialize the result to prepare it for the response
+    result = self.serializer_class(result, many=True)
+    print(result.data)  # Log the serialized data (for debugging purposes)
+
+    return Response(result.data)  # Return the serialized data as a response
+```
+- **Cache Key (cache_key)**: The cache_key variable is a unique identifier for the cached data. In this example, we’ve named it 'institution-trade'. It’s crucial that each distinct dataset you want to cache has its own unique key. This ensures that you’re retrieving the correct cached data when needed.
+
+- **cache.get(cache_key)**: This line attempts to retrieve data from the cache using the specified cache_key. If the data is found in the cache, it’s returned; otherwise, `None` is returned.
+
+- **Database Hit (self.get_queryset())**: If no cached data is found (result is None), the code proceeds to hit the database by calling `self.get_queryset()`. This method fetches the required data directly from the database.
+
+- **Caching the Data (cache.set(cache_key, result, n))**: Once the data is retrieved from the database, we proceed to store the data in Redis using the cache.set() method. The third parameter, n, specifies the cache timeout in seconds.
+
+Once we have added the caching mechanism, you can verify it's working by sending the same request multiple times.
+
+```bash
+Hitting DB
+[13/Aug/2024 15:48:44] "GET /api/get-institution-trade?name=PT%20Eastspring%20Investment%20Indonesia HTTP/1.1" 200 2535
+Cache retrieved!
+[13/Aug/2024 15:48:51] "GET /api/get-institution-trade?name=PT%20Eastspring%20Investment%20Indonesia HTTP/1.1" 200 2535
+```
+
+There is a small issue left though, notice that we are implementing the caching incorrectly. If we change the query parameter to different institution, we will still keep on getting the same result.
+
+#### 3. Fixing the Caching Implementation (2 points)
+1. **Objective**: Learn to effectively use caching in DRF.
+2. **Task**: Fix the caching implementation to correctly store data based on the provided query parameter.
+3. **Hint**: You can create a dynamic key for your cache based on the query parameter value!
+
+### Exercises
+#### 4. Filtering Data (2 points)
+1. **Objective**: Learn to use Django ORM.
+2. **Task**: Modify the existing query to also account for institutions in `top_buyers`.
+3. **Hint**: You can use `Q` method to implement `OR` filtering.
+
+#### 5. Adding Views (6 points)
+1. **Objective**: Have more proficiency on Django Rest Framework Viewsets and URLs.
+2. **Task**: Write at least **2** more views/endpoints, based on the database.
+3. **Hint**: You can get as creative as you want, try to have a user-centric approach and empathize on what kind of endpoints would be beneficial for the users.
+
+## Dive Deeper
+
+In a real world scenario, where you would be deploying your API service, you will need to add additional layers of authentication, meaning that only authorized users can have access 
+to your API -- and most importantly, your **data**. After verifying that the incoming request is authenticated, you can further configure `permission` and `throttling` policies which take in 
+the provided credentials to determine whether the request should be permitted or not.
+
+Django REST framework provides several [authentication](https://www.django-rest-framework.org/api-guide/authentication/) schemes out of the box, and also allows you to implement custom schemes.
+
+<Note>
+  Authentication always runs at the very start of the view, before the permission and throttling checks occur, and before any other code is allowed to proceed.
+  Don't forget that authentication by itself won't allow or disallow an incoming request, it simply identifies the credentials that the request was made with.
+</Note>
+
+If you want to take this lab to the next level and challenge yourself, try to add authentications to the current working code and see if you can still access your API without providing the 
+correct credentials!
+
+<Accordion title="Show full code">
+#### Adding Basic Authentication
+
+```python
+from rest_framework.permissions import IsAuthenticated
+
+class InstitutionsView(ListAPIView):
+    queryset = Institutions.objects.all()
+    serializer_class = InstitutionsSerializer
+    permission_classes = [IsAuthenticated,]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        institution_name = self.request.query_params.get('name', None)
+        if institution_name:
+            queryset = queryset.filter(top_sellers__contains=[{'name': institution_name}])
+        return queryset
+    
+    def list(self, request):
+        cache_key = 'institution-sell'
+        result = cache.get(cache_key)
+        if not result:
+            print('Hitting DB')
+            result = self.get_queryset()
+            cache.set(cache_key, result, 10)
+        else:
+            print('Cache retrieved!')
+
+        result = self.serializer_class(result, many=True)
+
+        return Response(result.data)
+```
+
+</Accordion>

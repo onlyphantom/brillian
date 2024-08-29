@@ -1,0 +1,306 @@
+---
+title: 'Introduction to NoSQL'
+description: 'A general introduction on NoSQL paradigm'
+---
+
+## What is NoSQL?
+
+In the ever-evolving landscape of data management, NoSQL databases have emerged as a powerful alternative to traditional relational database systems. 
+As organizations generate and process increasing volumes of diverse data, the need for flexible, scalable, and high-performance database solutions has become more critical than ever. 
+This is where NoSQL databases come into play.
+
+NoSQL, often termed as "not only SQL" or "non-SQL," is a database design approach that allows for the storage and 
+querying of data outside the traditional frameworks used in relational databases.
+
+While NoSQL can handle data typically managed by relational database management systems (RDBMS), 
+it organizes this data differently than an RDBMS. 
+The choice between using a relational or non-relational database depends heavily on the specific context and use case.
+
+Instead of the conventional tabular structure found in relational databases, 
+NoSQL databases store data in a single data structure, such as a JSON document. 
+This non-relational design doesn't require a fixed schema, offering the ability to rapidly scale and manage large, often unstructured data sets.
+
+NoSQL databases are also a form of distributed databases, meaning that data is replicated and stored across multiple servers, whether remote or local. 
+This distribution ensures data availability and reliability, so even if part of the database goes offline, the remaining parts can continue to function.
+
+### Brief History
+
+<Steps>
+  <Step title="Pre-2000s: The Rise of Relational Databases">
+    Before NoSQL, relational databases (RDBMS) like Oracle, MySQL, and SQL Server dominated the data storage landscape.
+    These databases used structured schemas and SQL for data management.
+  </Step>
+  <Step title="Late 1990s to Early 2000s: The Emergence of Web 2.0">
+    The growth of Web 2.0 companies like Google, Amazon, and Facebook created challenges for traditional databases. 
+    These companies needed to store and process large volumes of unstructured and semi-structured data while ensuring high availability and scalability.
+  </Step>
+  <Step title="1998: The term NoSQL Introduced">
+    Carlo Strozzi named his lightweight, open source "relational" database which was not using SQL as a `NoSQL`.
+  </Step>
+  <Step title="2000s: The Birth of NoSQL">
+    In response to these challenges in large volumes of data, new types of databases emerged. Google introduced Bigtable in 2004 (made publicly available in 2015), 
+    a distributed storage system designed to handle large-scale data.
+    Amazon launched Dynamo in 2007 (which later become DynamoDB in 2012), a key-value store that prioritized availability and scalability. These systems laid the groundwork for NoSQL databases.
+  </Step>
+  <Step title="2009: The Term 'NoSQL' Gains Popularity">
+    The term "NoSQL" was popularized in 2009 by Johan Oskarsson during a meetup to discuss open-source, non-relational databases. The term initially meant "No SQL," 
+    but it quickly evolved to mean "Not Only SQL," reflecting the flexibility of these databases in handling various data models.
+  </Step>
+  <Step title="2010s: Rapid Growth and Adoption">
+    Throughout the 2010s, NoSQL databases gained widespread adoption, particularly in industries requiring high scalability and performance. 
+    Popular NoSQL databases like MongoDB (document store), Cassandra (wide-column store), Redis (key-value store), and Neo4j (graph database) emerged, 
+    each optimized for specific use cases.
+  </Step>
+
+</Steps>
+
+### Key Features
+- **Schema Flexibility**: Unlike relational databases, where the schema (structure) of the data must be defined upfront, 
+NoSQL databases offer dynamic schema support. This means you can store data without a predefined structure, allowing for greater flexibility in handling varying data types.
+
+- **Scalability**: NoSQL databases are designed to scale out horizontally by distributing data across multiple servers or nodes. 
+This makes it easier to manage large volumes of data and handle high-velocity workloads, such as those seen in big data and real-time applications.
+
+- **High Availability**: Many NoSQL databases provide built-in support for replication and sharding, ensuring that data is distributed across multiple nodes. 
+This redundancy improves fault tolerance and availability, making NoSQL systems ideal for applications requiring minimal downtime.
+
+- **Performance**: By forgoing complex joins and other features of relational databases, NoSQL databases can achieve higher performance, 
+especially for read and write operations on large datasets. This makes them suitable for use cases where speed is crucial.
+
+## Types of NoSQL Databases
+
+There are four major types of NoSQL databases. Each one of them has its own specificity and use cases, so I'm suggesting you to read more on each and choose the one that best fits your needs.
+
+<AccordionGroup>
+  <Accordion title="Document Stores">
+    These databases store data in documents, usually in formats like JSON, BSON, or XML, and are designed for storing and querying semi-structured data. Each document contains pair of fields and values where 
+    the values can be a variety of types, including strings, numbers, booleans, arrays, or even other objects. 
+    Document stores are ideal for applications that require the storage of complex, hierarchical data structures.
+
+    **Example**:
+    ```plaintext
+    {
+        "_id": "12345",
+        "name": "John Doe",
+        "email": "john@brillian.com",
+        "address": {
+            "street": "123 Doe St.",
+            "city": "Jakarta TImur",
+            "state": "DKI Jakarta",
+            "zip": "123456"
+        },
+        "credit_score": 99
+    }
+    ```
+  </Accordion>
+  <Accordion title="Key-Value Stores">
+    In key-value databases, data is stored as a collection of key-value pairs, similar to a dictionary. Examples include Redis and Amazon DynamoDB. 
+    These databases are suitable for caching, session management, and real-time analytics as they provide high performance in read and writes because of how they *typically*
+    store things in memory.
+
+    **Example**:
+    ```plaintext
+    Key: user:12345
+    Value: {"name": "John Doe", "email": "john@brillian.com", "credit_score": 99}
+
+    Key: user:34567
+    Value: 999
+    ```
+
+    See how different keys can have different type of values!
+
+  </Accordion>
+  <Accordion title="Column-Family Stores">
+  Also known as wide-column stores, these databases organize data into rows and columns, but unlike relational databases, column names and formatting in wide-column stores can
+  vary from row to row in a single table. These databases are particularly well-suited for analytics scenarios, where you need to query specific columns and quickly aggregate their values. 
+  Common use cases for wide-column stores include catalogs, fraud detection, and recommendation engines. Good examples are Apache Cassandra and HBase.
+
+  **Example**:
+
+  | **name**        |  **id**  |   **email**        |   **dob** |   **city**    | **transaction_id**                    | **debit** |   **credit**  |
+  |-----------------|----------|--------------------|-----------|---------------|---------------------------------------|-----------|---------------|
+  | John Doe        | 12345    | john@brillian.com  | 20-01-1972| Surabaya      |  tx12345                              | 500       |               |
+  | John Doe        | 12345    | john@brillian.com  | 20-01-1972| Surabaya      |  tx12346                              |           |    300        |
+  | Ryan Mikes      | 23456    | ryan@brillian.com  |           |               |  tx12347                              |           |    1000       |
+
+
+  </Accordion>
+
+  <Accordion title="Graph Databases">
+  These databases are designed to store and manage graph data structures, consisting of nodes, edges, and properties. Neo4j and Amazon Neptune are prominent graph databases. 
+  They are particularly useful for applications involving complex relationships, such as social networks, recommendation engines, and fraud detection.
+
+  Example:
+    ```mermaid
+graph LR
+    A((Node: John)) -- transfers $200 --> B((Node: Ryan))
+    A -- transfers $500 --> C((Node: Tim))
+    B -- transfers $500 --> C
+    ```
+
+  </Accordion>
+
+</AccordionGroup>
+
+Outside these four categories, there is also a term called `multi-model databases`. To keep it simple, the term implies support of more than one type of NoSQL data model,
+allowing developers to be more flexible in their development requirements. 
+These databases have a unified database engine that can handle multiple data models within a database instance. Examples are CosmosDB and ArangoDB.
+
+## When to Use NoSQL
+NoSQL databases are not a one-size-fits-all solution, but they are particularly advantageous in certain scenarios:
+
+- **Big Data**: When dealing with massive volumes of unstructured or semi-structured data, NoSQL databases offer the scalability and flexibility required to manage such data effectively.
+
+- **Real-Time Analytics**: For applications requiring real-time data processing and analysis, NoSQL databases provide the performance and scalability needed to handle high-velocity data streams.
+
+- **Content Management Systems**: NoSQL databases are well-suited for managing dynamic content, such as blogs, forums, and e-commerce sites, where data structures can vary widely.
+
+- **Internet of Things (IoT)**: IoT applications generate vast amounts of data from various devices and sensors. NoSQL databases can efficiently store and process this data in real time.
+
+### Challenges of Using NoSQL
+While NoSQL databases offer numerous benefits, they also come with challenges:
+
+- **Lack of Standardization**: Unlike SQL, which is a standardized language across relational databases, NoSQL databases lack a unified query language, 
+making it harder to switch between different systems.
+
+- **Consistency Trade-offs**: Many NoSQL databases follow the `CAP theorem`, which states that a distributed system can only guarantee two out of three properties: 
+Consistency, Availability, and Partition Tolerance. As a result, developers may need to make trade-offs between these properties based on their application's requirements.
+
+- **Complexity**: Managing and optimizing NoSQL databases can be more complex than traditional relational databases, 
+especially for organizations unfamiliar with distributed systems.
+
+### SQL vs NoSQL
+
+NoSQL databases represent a paradigm shift in how we think about data management. 
+They offer the scalability, flexibility, and performance required to handle the demands of modern applications, 
+particularly those dealing with big data, real-time analytics, and unstructured data. 
+
+With all the advantages and challenges I have mentioned here, it's not a surprise that organizations combine the usage of both SQL and NoSQL. Some applications would stick to 
+relational SQL database, while others leverage NoSQL. Choosing the right database system depends on the specific needs of your application, and understanding the trade-offs is crucial for making an informed decision.
+
+|         | **SQL Databases** | **NoSQL Databases** |
+|---------|-------------------|---------------------|
+| **Language**  | Structured Query Language (SQL). | Varies based on the type of NoSQL database used.  |
+| **Schema**  | Fixed schema, it will be difficult to change the schema once data is stored. | Flexible schema, each *set* of data can contain different types of data. Schema is easier to changed if required. |
+| **Scalability** | Vertically scalable. | Optimized for horizontal scaling. NoSQL were developed with the aim to solve challenges of big data. |
+| **Properties**  | SQL Databases use the **ACID** (Atomicity, Consistency, Isolation, Durability) property. | NoSQL Databases use the **CAP** (Consistency, Availability, Partition Tolerance) property.
+
+
+## PostgreSQL and Unstructured Data
+
+<Note>
+  This section is written based on the experiences of analytics consultants at Supertype. We do not claim that PostgreSQL replaces NoSQL, but merely sharing how a relational 
+  database can handle unstructured data efficiently.
+</Note>
+
+While [PostgreSQL](https://www.postgresql.org/) is widely recognized as one of the most robust and feature-rich SQL-based relational database management systems (RDBMS), 
+it has also evolved to effectively handle unstructured data. PostgreSQL bridges the gap between traditional RDBMS capabilities and the flexibility required for 
+modern data management. Its ability to handle both structured and unstructured data within the same system makes it a unique and powerful choice for developers and organizations. 
+By offering support for various data types like JSON, XML, and large binary objects, as well as advanced indexing and full-text search capabilities, 
+PostgreSQL enables users to work with diverse datasets without sacrificing the strengths of an RDBMS.
+
+This makes Postgres a versatile database solution for a wide range of applications, from content management systems to big data analytics, 
+offering the best of both worlds: the reliability and structure of a SQL database, combined with the flexibility needed to handle modern, unstructured data challenges.
+
+To demonstrate PostgreSQL's capability to handle unstructured data, I'm going to show you some of the key features and provide syntax examples for each.
+
+1. **JSON and JSONB Data Types**
+
+    PostgreSQL offers support for `JSON` and `JSONB` (binary JSON) data types, enabling the storage of semi-structured data. 
+    JSON stores data in text format, while JSONB stores it in a binary format that is optimized for efficient processing and querying.
+
+    ```SQL
+    -- Creating a table to store customer transaction details
+    CREATE TABLE customer_transactions (
+        transaction_id SERIAL PRIMARY KEY,
+        customer_id INT,
+        transaction_details JSONB
+    );
+
+    -- Inserting transaction data in JSONB format
+    INSERT INTO customer_transactions (customer_id, transaction_details) VALUES 
+    (101, '{"type": "deposit", "amount": 1500.00, "currency": "USD", "date": "2024-07-22", "status": "completed"}'),
+    (102, '{"type": "withdrawal", "amount": 500.00, "currency": "EUR", "date": "2024-07-22", "status": "pending"}');
+
+    -- Querying JSONB data to get deposit transactions
+    SELECT customer_id, transaction_details->>'amount' AS amount 
+    FROM customer_transactions 
+    WHERE transaction_details->>'type' = 'deposit';
+    ```
+
+2. **HSTORE Data Types**
+
+    `hstore` is quite similar with JSON/JSONB, but is *simpler*. Keys and values in hstore must be text, and does not support nested structures or complex data types.
+    Depending on your data and specific use case, both options can be considered.
+
+    ```SQL
+    -- Creating a table to store customer preferences
+    CREATE TABLE customer_preferences (
+        customer_id SERIAL PRIMARY KEY,
+        preferences HSTORE
+    );
+
+    -- Inserting data into the HSTORE column
+    INSERT INTO customer_preferences (preferences) VALUES 
+    ('"email" => "yes", "sms" => "no", "account_alerts" => "daily", "device_language" => "en"');
+
+    -- Querying HSTORE data to find customers who prefer daily account alerts
+    SELECT customer_id FROM customer_preferences 
+    WHERE preferences->'account_alerts' = 'daily';
+    ```
+
+3. **Full-Text Search**
+
+    Banks often need to search through vast amounts of textual data, such as customer support logs, transaction descriptions, or legal documents. 
+    PostgreSQL’s full-text search capability allows for efficient indexing and searching of this unstructured text data. You can check the [documentation](https://www.postgresql.org/docs/current/textsearch-intro.html#TEXTSEARCH-MATCHING) 
+    for more details.
+
+    ```SQL
+    -- Creating a table to store customer support logs
+    CREATE TABLE support_logs (
+        log_id SERIAL PRIMARY KEY,
+        customer_id INT,
+        log_text TEXT,
+        tsv_log TSVECTOR
+    );
+
+    -- Populating the tsvector column for full-text search
+    UPDATE support_logs SET tsv_log = to_tsvector(log_text);
+
+    -- Querying the logs for specific keywords related to transaction disputes
+    SELECT customer_id, log_text FROM support_logs 
+    WHERE tsv_log @@ to_tsquery('dispute & transaction');
+    ```
+    `to_tsvector` here is used to parse and normalize a document string, hence the elements of a `tsvector` are lexemes. Words like `disputes` would be normalized to `dispute`, 
+    allowing for a more robust and powerful search.
+
+Other than these three, PostgreSQL also supports `XML` and `Large Object Storage (LOBs)`. We can even use advanced indexing techniques to efficiently query data which are stored in JSONB format.
+
+In conclusion, PostgreSQL is more than just a traditional relational database; it is a highly flexible platform capable of handling a wide range of unstructured and semi-structured data types.
+This versatility makes PostgreSQL an ideal choice for modern applications that require both the reliability of an RDBMS and the flexibility to handle diverse data types. My take is: you can get a subset of 
+NoSQL in PostgreSQL, but you can't get a subset of SQL relational features in NoSQL.
+
+## Summary
+
+In this chapter, we explored the fundamental concepts of NoSQL, emphasizing its strengths in handling the demands of the big data era. 
+NoSQL databases excel in scalability, flexibility, and performance when dealing with large volumes of unstructured or semi-structured data, 
+making them a powerful choice in today's data-driven world. I've also included several examples on each types of NoSQL databases, giving you more confidence in picking which 
+type would work best in your future use cases. To close off this introduction, I've also shown you an alternative of using PostgreSQL to handle all the relational features you would need 
+from a RDBMS, while also having the capabilities to handle unstructured data for your applications.
+
+Moving to the next chapter, we'll dive into practical examples, demonstrating how to effectively use both SQL and NoSQL in a data science project. 
+This hands-on approach will highlight how each type of database can be leveraged to address specific challenges and enhance data processing capabilities.
+
+### References
+
+1. [NoSQL Explained](https://www.mongodb.com/resources/basics/databases/nosql-explained)
+2. [What is NoSQL](https://cloud.google.com/discover/what-is-nosql)
+3. [PostgreSQL](https://www.postgresql.org/)
+
+## Author
+This chapter is written by [Vincentius Christopher Calvin](https://www.linkedin.com/in/vincentiuscalvin/), a partner at Supertype, where he leads critical projects across the company. 
+His work includes managing key initiatives for Adaro groups, such as AMT's Real-Time Water Level Monitoring & Forecasting and SIS's Predictive Maintenance projects. 
+He has also served as a consultant for major clients like IDX (Bursa Efek Indonesia) and Bank Indonesia, and is also a lead at [Sectors API Platform](https://sectors.app/api).
+
+Calvin specializes in Machine Learning Ops (MLOps), Backend Engineering, and API development. 
+He is a certified TensorFlow Developer and has a strong passion for creating user-centric products, including apps published on the App Store. 

@@ -64,6 +64,13 @@
       ]
     },
     {
+      "group": "Apache Kafka and Redis",
+      "pages": [
+        "kafka-redis/nosql",
+        "kafka-redis/lab_drf_redis"
+      ]
+    },
+    {
       "group": "Final Project",
       "pages": [
         "final-project/django-route",
