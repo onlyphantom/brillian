@@ -341,3 +341,154 @@ volumes:
   cassandra-data:
   mysql-data:
 ```
+
+## OLTP and OLAP Database Setup
+In this section, we will design the OLTP (Online Transaction Processing) database schema and implement it in **Cassandra**. **Cassandra** is a NoSQL database that excels at handling high volumes of writes and reads, making it well-suited for OLTP workloads. 
+Its distributed architecture and ability to scale horizontally enable efficient data storage and retrieval for real-time transactional applications.
+
+Additionally, we will design the OLAP (Online Analytical Processing) database schema and implement it in **MySQL**. 
+**MySQL** is a widely used relational database management system that excels in handling multidimensional tables, making it well-suited for OLAP workloads. 
+Its robust support for complex queries and aggregations makes it an ideal choice for analytical applications.
+
+By leveraging the strengths of Cassandra for OLTP and MySQL for OLAP, we can build a comprehensive data processing pipeline that handles both real-time transactional data and analytical queries effectively.
+
+Before we begin, we need to build and run all of the services defined in the docker-compose.yml file. 
+To do so, ensure you have Docker Desktop installed and running on your machine and navigate to the project directory and execute the following command:
+
+```bash
+docker compose up -d
+```
+
+### OLTP Database Design and Implementation
+
+Let's access the Cassandra container and launch CQL shell by running the following commmand:
+
+```bash
+docker exec -it cassandra cqlsh
+```
+
+This command will open an interactive session within the Cassandra container, allowing you to execute CQL queries and interact with the database.
+
+Now, we will create a new keyspace named `trading` by executing the following command:
+
+```cql
+CREATE KEYSPACE trading WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+```
+
+Note that the replication class of `SimpleStrategy` and a replication factor of one are only suitable for development purposes. 
+In a production environment with multiple data centers, it is essential to use other replication strategies (i.e. NetworkTopologyStrategy) and replication factors (greather than one) to ensure fault tolerance and high availability.
+
+<AccordionGroup>
+  <Accordion title="SimpleStrategy">
+    This strategy is useful for a single data center and one rack for development and testing environments only. 
+    It should never be used in production.
+  </Accordion>
+
+  <Accordion title="NetworkTopologyStrategy">
+    This strategy is good for production or staging environments. As the name suggests, it’s network topology aware, meaning it understands your servers, server racks, and data centers. 
+    This strategy is preferred for most deployments because it’s much easier to expand to multiple data centers when needed.
+  </Accordion>
+</AccordionGroup>
+
+Next, we will create a new table named `real_time_data` in the `trading` keyspace by executing the following command:
+
+```sql
+USE trading;
+
+CREATE TABLE trading.real_time_data (
+           ... id INT PRIMARY KEY,
+           ... created_at TIMESTAMP,
+           ... ticker VARCHAR,
+           ... sector TEXT
+           ... volume INT,
+           ... market_cap INT,
+           ... price FLOAT,
+           ... );
+```
+
+This table will be part of our OLTP database, which will store transactional data (raw stock trading data) for our application. 
+This table will have several columns including `id`, `created_at`, `volume`, `market_cap`, `ticker`, `price`, and `sector`. The `id` column will serve as the primary key for the table, ensuring uniqueness for each entry.
+
+To illustrate, here is an example of how the row in the table will look like:
+
+|    id    |           created_at            | ticker  |         sector           | volume | market_cap | price |
+|----------|---------------------------------|---------|--------------------------|--------|------------|-------|
+|    11    | 2024-08-25 07:04:45.000000+0000 | TMAS.JK | Logistics & Deliveries   | 275674 |   4932000  |  550  |
+
+Note that the timestamps in the `created_at` column are stored in UTC timezone, which is the default format for Cassandra.
+
+### OLAP Database Design and Implementation
+Now, we will access the MySQL container and launch the MySQL shell by executing the following command:
+
+```bash
+docker exec -it mysql mysql -u root -p
+```
+
+You will be prompted to enter the password for the root user. We have set the password to **root** in the `docker-compose.yml` file, so enter root as the password.
+
+After entering the password, you will be logged into the MySQL shell. Now, we will create a new database named `trading` by executing the following command:
+
+```sql
+CREATE DATABASE trading;
+```
+
+After successfully creating the database, we can now use it to create tables. For this lab, we'll use one dimension table, profile, which serves as our master table to store company profiles. 
+The table will have four attributes: `ticker`, `company_name`, `sector`, and `shares`. The ticker acts as the **primary key**. 
+Sector will be the column where we aggregate and analyze the data. 
+Finally, Shares will be used to calculate the market cap if needed. Please note that the data we’ll populate is partially masked (not using actual values) and is for lab purposes only.
+
+```sql
+CREATE TABLE profile (
+  ticker VARCHAR PRIMARY KEY,
+  company_name TEXT,
+  sector TEXT,
+  shares INT
+  );
+```
+
+After successfully creating the table with the corresponding schema, we can then populate the table using this [data](https://github.com/onlyphantom/brillian/blob/main/datasets/idx_company_profile_080824.csv).
+
+Finally, let's add another table named `aggregated_data`. The aggregated_data table will store aggregated volume data in a microbatch fashion. 
+It consist of the following attributes: `processing_id`, `processed_at`, `sector`, `total_volume`, and `date`. The processing_id serves as the primary key for this table. 
+The processed_at column stores the timestamp when the microbatch is processed. 
+The date column stores the date of the closing trade. It also has the sector value which will be the grouping key for this table.
+The total_volume column stores the total volume of traded stocks for a given microbatch. 
+Since the data is aggregated in microbatches, there can be multiple rows with the same date and sector, but different processing_id, processed_at, and total_volume values.
+
+```sql
+CREATE TABLE aggregated_data (
+  processing_id INT AUTO_INCREMENT,
+  processed_at TIMESTAMP,
+  date DATE,
+  sector TEXT,
+  total_volume INT,
+  );
+```
+
+In this section, we have demonstrated how to implement an OLTP database using Cassandra and an OLAP database using MySQL. 
+By combining the capabilities of both the OLTP and OLAP databases, we can support transactional operations while enabling powerful analytical capabilities for decision-making purposes.
+
+## Data Ingestion and Processing 
+
+Once we are done with our database setup, we are more than ready to dive on how to ingest and process transactional data streams using Kafka and Spark Streaming.
+
+[Kafka](/kafka-redis/kafka) is a distributed streaming platform that excels in handling high-throughput, fault-tolerant, and real-time data streams. It provides publish-subscribe messaging system where data is organized into topics and distributed across multiple partitions. 
+Many organizations such as LinkedIn, Netflix, and Uber use Kafka to build real-time data pipelines and streaming applications.
+
+Spark Streaming is a powerful component of the Apache Spark ecosystem that enables scalable, fault-tolerant and (near) real-time processing of streaming data. 
+It extends the core capabilities of Apache Spark to handle continuous streams of data in a microbatch fashion, which means that the data is processed and analyzed in small and continuous intervals. 
+Spark Streaming can be used to process data streams from various sources such as Kafka, Flume, and Kinesis.
+
+In our data pipeline, we utilize the power of Kafka to efficiently load the raw transactional data into Kafka topics. We will then leverage Spark Streaming to process the data in a microbatch fashion and write the processed data to the OLTP database. 
+Simultaneously, the aggregated transactional data will be directed to the OLAP databases, allowing us to perform insightful analytical queries on the data.
+
+By combining the strengths of Kafka, Spark Streaming, and our database infrastructure, we establish a robust and scalable data pipeline that enables (near) real-time data processing, seamless data storage, and insightful analytics.
+
+### Getting Started with Kafka Producer
+
+Let's connect to the Kafka container and launch the Kafka shell by executing the following command:
+
+```bash
+docker exec -it kafka bash
+```
+
