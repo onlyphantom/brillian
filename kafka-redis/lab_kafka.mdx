@@ -1,0 +1,343 @@
+---
+title: 'Lab: Streaming Data Pipeline'
+description: 'Build a streaming data pipeline using Kafka, Spark Streaming, Cassandra, and MySQL'
+icon: flask
+---
+
+## Pre-Lab Preparation & Prerequisites
+<CardGroup cols={2}>
+  <Card icon="gears" title="Docker" href="https://docs.docker.com/get-started/get-docker/">
+    Install Docker on your machine, follow the guides depending on the OS your device is running.
+  </Card>
+  <Card icon="youtube" title="Docker Fundamentals" href="https://youtu.be/ZlLwDN9_Gwg?si=7J0cZzeRMvLkfNYU">
+    You will need to have a basic understanding of Docker, especially on Docker Compose.
+  </Card>
+  <Card icon="key" title="Introduction to NoSQL" href="/kafka-redis/nosql">
+    Review the module to familiarize yourself with the NoSQL paradigm.
+  </Card>
+  <Card icon="key" title="Introduction to Kafka" href="/kafka-redis/kafka">
+    Review the module to understand the key concepts of Kafka as a data streaming tool.
+  </Card>
+</CardGroup>
+
+## Overview
+In the previous section, we have learned the theoretical concept of Apache Kafka and its role in real time data streaming. 
+You will put the theory into practice in this lab, where we will explore the power of open-source technologies (Kafka, Spark Structured Streaming, Cassandra and MySQL) 
+to build a robust and scalable streaming data processing pipeline. We will begin by producing simulated raw stock price data using a producer and sending it to Kafka. 
+Leveraging the microbatch processing capabilities of [Spark Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html), we will load the raw data into [Cassandra](https://cassandra.apache.org/_/index.html), a distributed NoSQL database, for real-time transaction processing (OLTP). 
+Simultaneously, we will aggregate the data and store it in [MySQL](https://www.mysql.com/), a relational database, for analytical processing (OLAP). 
+To bring the insights to life, we will then visualize the aggregated data in the form of a dynamic dashboard using [Streamlit](https://streamlit.io/), an open-source Python library to build custom web apps. 
+This comprehensive architecture allows organizations to extract (near) real-time insights from streaming data, enabling informed decision-making and improved business performance.
+
+## Project Environment
+To start the project, we will create a new directory named `streaming_data_processing` or any name you would like to identify the project as. 
+Next, make a new file named `docker-compose.yml` in the project directory and copy the following into the file:
+
+```yaml docker-compose.yml
+version: '1'
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.9.2
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper-data:/bitnami/zookeeper
+
+  kafka:
+    image: bitnami/kafka:3.5.2
+    container_name: kafka
+    ports:
+      - "29092:29092"
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_ENABLE_KRAFT=no
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:29092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+
+    volumes:
+      - kafka-data:/bitnami/kafka
+    depends_on:
+      - zookeeper
+    restart: always
+
+  spark:
+    image: bitnami/spark:3.5.2
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+      - "4040:4040"
+    volumes:
+      - ./spark_script:/spark_script
+      - ./spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+    depends_on:
+      - zookeeper
+      - kafka
+      - cassandra
+    command: bash -c "python -m pip install py4j==0.10.9.7 && tail -f /dev/null"
+
+  spark-worker:
+    image: docker.io/bitnami/spark:3.5.2
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+    depends_on:
+      - zookeeper
+      - kafka
+      - cassandra
+    command: bash -c "python -m pip install py4j==0.10.9.7 && tail -f /dev/null"
+
+  cassandra:
+    image: cassandra:5.0
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+
+  mysql:
+    image: mysql:9.0.1
+    container_name: mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  zookeeper-data:
+  kafka-data:
+  cassandra-data:
+  mysql-data:
+```
+Don't feel intimidated with the contents of the Docker Compose file. We will go through each of the services in the next section.
+
+Next, we will create a new file named `spark-defaults.conf` in the project directory, which contains the Spark application configuration properties. We will populate the file later, so for now we can leave it empty.
+
+Last, we will create a new folder `spark_script` in the project directory, which will be used to store the Spark application script. For now, we can leave the folder empty.
+
+After you have completed through all the steps, the project structure will now look like this:
+
+```tree
+streaming_data_processing
+├── docker-compose.yml
+├── spark-defaults.conf
+└── spark_script
+```
+
+## Understanding Docker
+The `docker-compose.yml` file include seven services: `zookeeper`, `kafka`, `spark`, `spark-worker`, `cassandra`, and `mysql`. 
+For each service, we define the service name and other configurations such as `image`, `container_name`, `ports`, `environment`, `volumes`, `depends_on`, `restart`, and `command`. 
+Below is a brief description of each configuration.
+
+* **service name** is used to identify and reference a specific service within the Docker Compose file.
+* **image** configuration specifies the Docker image to be used for the service which will be pulled from Docker Hub.
+* **container_name** configuration allows us to assign a custom name to the container created from the image. Although it doesn’t have to match the service name, it is recommended to keep them consistent.
+* **ports** configuration defines the port mappings between the host machine and the container. It allows us to access services running inside the container from the host using specified ports.
+* **environment** configuration is used to set environment variables specific to the container.
+* **volumes** configuration is used to mount either Docker volumes or bind mounts inside the container. Docker volumes provide a means to persist data generated by the container by creating and managing storage entities that are independent of the host’s filesystem. On the other hand, bind mounts establish a direct mapping between a directory on the host and a directory inside the container. This allows us to retain data even after the container is removed.
+* **depends_on** configuration specifies the service that the current service depends on, which ensures that the current service will not start until all the dependencies are started.
+* **restart** configuration determines the restart policy for a container. By default, it is set to no, which means the container will not automatically restart if it stops or encounters an error.
+* **command** configuration specifies the command that will be executed when the container starts.
+
+Now, let's discuss each service and some of the important configurations in details.
+
+### Zookeeper
+
+```yaml
+zookeeper:
+  image: bitnami/zookeeper:3.9.2
+  container_name: zookeeper
+  ports:
+    - "2181:2181"
+  environment:
+    - ALLOW_ANONYMOUS_LOGIN=yes
+  volumes:
+    - zookeeper-data:/bitnami/zookeeper
+```
+
+The zookeeper service is a centralized coordinator for managing metadata and maintaining the overall state of the Kafka cluster. 
+It keeps track of the broker's metadata, such as which brokers are alive, what topics they are handling, and how partitions are distributed across brokers.
+Zookeeper is also responsible for electing the leader broker among the available brokers and ensuring that this leadership is maintained or reassigned if the leader broker fails.
+
+For the environment configuration, we set `ALLOW_ANONYMOUS_LOGIN` to yes so that we can connect to the zookeeper service without authentication. 
+Note that this is **not recommended** for production environments. In the provided configuration, the volumes demonstrates the usage of Docker volumes (not bind mounts).
+
+### Kafka 
+
+```yaml
+kafka:
+  image: bitnami/kafka:3.5.2
+  container_name: kafka
+  ports:
+    - "29092:29092"
+  environment:
+    - ALLOW_PLAINTEXT_LISTENER=yes
+    - KAFKA_ENABLE_KRAFT=no
+    - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+    - KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:29092
+    - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+    - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+    - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+
+  volumes:
+    - kafka-data:/bitnami/kafka
+  depends_on:
+    - zookeeper
+  restart: always
+```
+
+* `ALLOW_PLAINTEXT_LISTENER=yes`
+
+  This allows Kafka to accept connections over a plaintext (unencrypted) protocol. By default, Kafka might require secure connections, but setting this variable to "yes" allows plaintext communication.
+  While enabling plaintext listeners can be convenient for local development or testing, it's not recommended for production environments due to the lack of encryption. For production, use secure communication protocols like SSL/TLS.
+
+* `KAFKA_ENABLE_KRAFT=no`
+  
+  KRaft (Kafka Raft Metadata Mode) is a new way of managing metadata without Zookeeper. Setting this to "no" disables KRaft, making Kafka rely on Zookeeper.
+  
+* `KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181`
+
+  This variable specifies the hostname and port of the Zookeeper server. Since we are using Docker Compose, we can use the service name zookeeper as the hostname and the default Zookeeper port 2181.
+
+We also need to configure two listeners, one for internal client (other services within the Docker network) and another one for external client (clients outside the Docker network, 
+i.e. the host machine). We will name the listener for the internal client as INTERNAL, and the listener for the external client as EXTERNAL. 
+These listeners are defined using the following environment configurations:
+
+* `KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:29092`
+
+  This sets up Kafka listeners on two different interfaces: one internal and one external. INTERNAL://:9092 listens on port 9092 for internal traffic, and EXTERNAL://:29092 listens on port 29092 for external traffic.
+  Here we don’t specify any hostname or IP address for both listeners, which means Kafka will listen on all network interfaces within the specified port. 
+  Use different listeners for internal and external traffic to separate traffic flow. Consider using secure protocols (e.g., SSL) for the external listener to protect data in transit.
+
+* `KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:29092`
+
+  These are the addresses Kafka advertises to clients for connecting. Internal clients should connect to kafka:9092, while external clients connect to localhost:29092.
+
+* `KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT`
+
+  The security protocol used for each listener. In our case, we are using the PLAINTEXT protocol for both listeners, indicating that no authentication is required.
+
+* `KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL`
+
+  The name of the listener used for communication between brokers. Typically the listener for the internal client is used for inter-broker communication.
+
+For the ports configuration, we need to expose the external listener port 29092 to the host machine so that we can connect to the kafka service from the host machine.
+
+Since the kafka service depends on the zookeeper service, we specify zookeeper in the `depends_on` configuration to ensure that the zookeeper service is started before the kafka service. 
+As of the authors' experiences, there are several occurences where kafka service stopped unexpectedly, so we should set restart configuration to **always** to ensure that the kafka service will be restarted automatically if it stops or encounters an error.
+
+### Spark
+
+```yaml
+spark:
+  image: bitnami/spark:3.5.2
+  container_name: spark
+  environment:
+    - SPARK_MODE=master
+  ports:
+    - "8080:8080"
+    - "4040:4040"
+  volumes:
+    - ./spark_script:/spark_script
+    - ./spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+  depends_on:
+    - zookeeper
+    - kafka
+    - cassandra
+  command: bash -c "python -m pip install py4j==0.10.9.7 && tail -f /dev/null"
+
+spark-worker:
+  image: docker.io/bitnami/spark:3.5.2
+  container_name: spark-worker
+  environment:
+    - SPARK_MODE=worker
+    - SPARK_MASTER_URL=spark://spark:7077
+    - SPARK_WORKER_MEMORY=1G
+    - SPARK_WORKER_CORES=1
+  ports:
+    - "8081:8081"
+  volumes:
+    - ./spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+  depends_on:
+    - zookeeper
+    - kafka
+    - cassandra
+  command: bash -c "python -m pip install py4j==0.10.9.7 && tail -f /dev/null"
+```
+Here the **spark** service is configured as the Spark **master** node and **spark-worker** service is configured as the Spark **worker** node, as indicated by the `SPARK_MODE` under environment configuration. 
+Besides SPARK_MODE, we also specify the following environment configurations for the spark-worker service:
+
+* `SPARK_MASTER_URL=spark://spark:7077` – The URL of the Spark master node. Here we use the service name spark as the hostname and the default Spark master port 7077.
+* `SPARK_WORKER_MEMORY=1G` – The amount of memory to use for the Spark worker node.
+* `SPARK_WORKER_CORES=1` – The number of cores to use for the Spark worker node.
+
+For spark, we expose ports 8080 (Spark master web UI) and 4040 (Spark application web UI). The Spark application web UI shows detailed information about the Spark application’s progress and executed tasks. For spark-worker service, we only expose port 8081, which is the Spark worker web UI.
+
+For both spark and spark-worker services, we mount the `spark-defaults.conf` file into the containers by providing a direct mapping between a directory on the host and a directory inside the container. This file contains the configuration properties for the Spark application. 
+We also mount the spark_script directory into the container of spark service, which will be used to store the Python script that we will submit to the Spark application.
+
+We also add a command configuration to both spark and spark-worker services to install the **py4j** library, which is required to run the Python script within the Spark application. 
+The `tail -f /dev/null` command is used to keep the container running indefinitely.
+
+<Tip> 
+  In real practice, you can enhance task performance by increasing the number of Spark worker nodes or increasing the number of cores and memory for each Spark worker node. 
+  However, you need to ensure that your machine has sufficient resources to support the desired configuration.
+</Tip>
+
+### Cassandra
+
+```yaml
+cassandra:
+  image: cassandra:5.0
+  container_name: cassandra
+  ports:
+    - "9042:9042"
+  volumes:
+    - cassandra-data:/var/lib/cassandra
+```
+The configurations for cassandra service are pretty straightforward and easy to understand. 
+We just need to specify the port (default to 9042) and the usage of Docker volumes for data persistence.
+
+### MySQL 
+
+```yaml
+mysql:
+  image: mysql:9.0.1
+  container_name: mysql
+  ports:
+    - "3307:3306"
+  environment:
+    MYSQL_ROOT_PASSWORD: root
+  volumes:
+    - mysql-data:/var/lib/mysql
+```
+
+Notice that the port for mysql service is set to 3307 instead of the default port 3306. This is because I already have another mysql service running on port 3306 on my host machine. If you do not have a mysql service running on your host machine, you can use the default port 3306 instead. 
+We also set the `MYSQL_ROOT_PASSWORD` to `root` for simplicity, which will be used later to connect to the MySQL server using the **root** user.
+
+At the end of the `docker-compose.yml` file, we specify all the Docker volume names to ensure that the volume names used in the services’ configurations are recognized properly.
+
+```yaml
+volumes:
+  zookeeper-data:
+  kafka-data:
+  cassandra-data:
+  mysql-data:
+```
