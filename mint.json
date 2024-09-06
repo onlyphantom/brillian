@@ -67,7 +67,9 @@
       "group": "Apache Kafka and Redis",
       "pages": [
         "kafka-redis/nosql",
-        "kafka-redis/lab_drf_redis"
+        "kafka-redis/lab_drf_redis",
+        "kafka-redis/kafka",
+        "kafka-redis/lab_kafka"
       ]
     },
     {
