@@ -330,7 +330,7 @@ mysql:
 ```
 
 Notice that the port for mysql service is set to 3307 instead of the default port 3306. This is because I already have another mysql service running on port 3306 on my host machine. If you do not have a mysql service running on your host machine, you can use the default port 3306 instead. 
-We also set the `MYSQL_ROOT_PASSWORD` to `root` for simplicity, which will be used later to connect to the MySQL server using the **root** user.
+We also set the `MYSQL_ROOT_PASSWORD` to `root` for simplicity, which will be used later to connect to the MySQL server using the `root` user.
 
 At the end of the `docker-compose.yml` file, we specify all the Docker volume names to ensure that the volume names used in the services’ configurations are recognized properly.
 
@@ -492,3 +492,560 @@ Let's connect to the Kafka container and launch the Kafka shell by executing the
 docker exec -it kafka bash
 ```
 
+Now, we will create two new topics: `test_topic` (for testing purposes) and `trading_data` (for storing the raw transactional data). We will create the topics by executing the following commands:
+
+```bash
+kafka-topics.sh --create --topic test_topic --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+kafka-topics.sh --create --topic trading_data --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+```
+
+`kafka-topics.sh` is a command-line tool that is implemented as a shell script. It is used to create, alter, list, and describe topics in Kafka. 
+Below are a bried explanation of the flags used in the above commands:
+
+* `--create` flag is used to create a new topic.
+* `--topic` flag is used to specify the name of the topic.
+* `--bootstrap-server` flag is used to specify the address and port of the Kafka broker to connect to. We set it to kafka:9092 because in the docker-compose.yml file we set the KAFKA_CFG_ADVERTISED_LISTENERS as INTERNAL://kafka:9092,EXTERNAL://localhost:29092. Note that using localhost:29092 will work as well because the kafka container could connect to both the internal and external listeners.
+* `--partitions flag` is used to specify the number of partitions for the topic. The number of partitions determines the parallelism and scalability of data processing in Kafka. In our case, we set the number of partitions to 1 because we are running a single Kafka broker. In a production environment, we would typically have multiple Kafka brokers and we would set the number of partitions to a value greater than 1 to ensure higher throughput and better resource distribution.
+* `--replication-factor` flag is used to specify the number of replicas for the topic. A replication factor of 1 is sufficient for our purposes because we are running a single Kafka broker. In a production environment, we would typically have multiple Kafka brokers and we would set the replication factor to a value greater than 1 to ensure fault-tolerance.
+
+You can verify that the topics have been created by executing the following command:
+
+```bash
+kafka-topics.sh --list --bootstrap-server kafka:9092
+```
+
+Next, we will prepare a Python script that will be used to generate the raw transactional data. 
+Before we do that, we will create a new virtual environment (in my case, I'm personally using Conda) and install the required Python packages. To do so, navigate to your project directory and execute the following commands:
+
+```bash
+conda create -n sdp python=3.10
+conda activate sdp
+pip install kafka-python==2.0.2 cassandra-driver==3.29.1 mysql-connector-python==9.0.0
+```
+
+**kafka-python** is a Python client library for Kafka that offers convenient high-level Producer and Consumer classes. 
+These classes allow us to easily send and receive messages to and from Kafka within Python applications. 
+On the other hand, **cassandra-driver** and **mysql-connector-python** are both Python client libraries designed for interacting with Cassandra and MySQL databases (respectively), which allows us to easily establish connections to the corresponding database and execute queries on the database.
+
+Now, let’s create a new Python script called `producer.py` in the project directory and add the following code:
+
+```python
+import random
+import sys
+import time
+from datetime import datetime
+from json import dumps
+
+from cassandra.cluster import Cluster
+from kafka import KafkaProducer
+import mysql.connector
+
+CASSANDRA_HOST = 'localhost'
+CASSANDRA_KEYSPACE = 'trading'
+CASSANDRA_TABLE = 'real_time_data'
+
+MYSQL_HOST = 'localhost'
+MYSQL_PORT = 3307
+MYSQL_DATABASE = 'trading'
+MYSQL_TABLE = 'profile'
+MYSQL_USERNAME = 'root'
+MYSQL_PASSWORD = 'root'
+
+KAFKA_BOOTSTRAP_SERVER = 'localhost:29092'
+```
+
+The above code imports the necessary packages, as well as setting up all the environment variables we need in the Producer script. In producion, you should not hardcode these values, especially when there 
+are credentials which you should never expose to the public. Instead, create a `.env` file and load the values from there. Make sure to adjust these configurations depending on the environment variables you set earlier in your `docker-compose.yml` file!
+
+It’s also important to note that we are connecting to the Kafka broker from the host machine, so we need to use the hostname and port for the external client.
+
+Next, we define the `get_last_id()` function, which is used to retrieve the last ID from the Cassandra table. We will need this function later determine the ID of the next message to be produced when the producer application is started.
+
+```python
+def get_last_id():
+    cluster = Cluster([CASSANDRA_HOST])
+    session = cluster.connect(CASSANDRA_KEYSPACE)
+    query = f"SELECT MAX(id) AS last_id FROM {CASSANDRA_TABLE}"
+    result = session.execute(query)
+    last_id = result.one().last_id
+    return last_id if last_id else 0
+```
+
+Another helper function for the data simulation is also needed to fetch the full list of companies' symbols and metadata, which are stored in the `profile` table on our MySQL database.
+
+```python
+def get_tickers():
+    config = {
+            'user': MYSQL_USERNAME,
+            'password': MYSQL_PASSWORD,
+            'host': MYSQL_HOST,
+            'port': MYSQL_PORT,
+            'database': MYSQL_DATABASE,
+            'raise_on_warnings': True
+            }
+
+    cnx = mysql.connector.connect(**config)
+
+    with cnx.cursor(dictionary=True) as c:
+        result = c.execute(f"SELECT * FROM {MYSQL_TABLE}")
+
+        rows = c.fetchall()
+
+    cnx.close()
+
+    return rows
+```
+
+Then, we define the produce_message() function, which is used to generate a random data for a given trading interval.
+
+```python
+def produce_message(id, ticker, shares, sector, min_price=500, max_price=600):
+    message = {}
+    price = random.randint(min_price, max_price)
+    message["id"] = id
+    message["ticker"] = ticker
+    message["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    message['price'] = price
+    message['market_cap'] = price * shares
+    message['volume'] = random.randint(10e4, 10e5)
+    message['sector'] = sector
+    return message
+```
+
+There is absolutely nothing fancy in the code. We simply randomize the price and volume, and calculate the market_cap based on the price and number of outstanding shares.
+
+Having set up all the necessary functions, we can now define a `main()` function that is used to start the full Kafka Producer application.
+
+```python
+def main():
+    tickers = get_tickers()
+    KAFKA_TOPIC = sys.argv[1]
+    producer = KafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP_SERVER,
+                            value_serializer=lambda x: dumps(x).encode('utf-8'))
+    last_id = get_last_id()
+    print("Kafka producer application started.")
+
+    try:
+        while True:
+            message = []
+            for ticker in tickers:
+                id = last_id + 1
+                message.append(produce_message(id, ticker['ticker'], ticker['shares'], ticker['sector']))
+                last_id = id  
+            print(f"Produced message: {message}")
+            producer.send(KAFKA_TOPIC, message)
+            time.sleep(5)  
+    except KeyboardInterrupt:
+        producer.flush()
+        producer.close()
+        print("Kafka producer application completed.")
+```
+
+The `main()` function begins by assigning the value of the first command-line argument (`sys.argv[1]`) to the `KAFKA_TOPIC` variable, which will serve as the destination Kafka topic for the messages. 
+The `KafkaProducer` object is created using the previously defined `KAFKA_BOOTSTRAP_SERVER`. We also specify the `value_serializer` parameter to serialize the message value to JSON format. 
+For the first message to be produced, we retrieve the last ID from the Cassandra table, which is done by calling the `get_last_id()` function.
+
+Within the while loop, we continuously generate and send messages to the Kafka topic. An inner loop was also added to iterate through all of the available symbols, 
+where each of them will append the `message` variable with the value returned by the produce_message() function.  
+The messages are send to the Kafka topic using the `send()` method of the KafkaProducer object. The while loop will continue indefinitely until the user interrupts the process by pressing `Ctrl+C` in the terminal. 
+When this happens, the producer application will be terminated.
+
+To verify if the **producer.py** script is working properly, we can do the following steps:
+1. Set up a Kafka Consumer within the kafka container to consume messages from the test_topic topic. To do so, open a new terminal window and execute the following command:
+  ```bash
+  docker exec -it kafka bash
+  kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic test_topic
+  ```
+
+2. Concurrently run the producer.py script in the host machine to produce messages to the test_topic topic. To do so, open another terminal window and execute the following command:
+  ```bash
+  python producer.py test_topic
+  ```
+
+3. Observe that the message produced by the producer.py script appears on the Kafka consumer in the corresponding terminal. The message should look something like this:
+  ```bash
+  [{"id": 521, "ticker": "ALTO.JK", "created_at": "2024-09-05 07:52:35", "price": 538, "market_cap": 538000, "volume": 195668, "sector": "Beverages"}, 
+  {"id": 522, "ticker": "BUDI.JK", "created_at": "2024-09-05 07:52:35", "price": 563, "market_cap": 675600, "volume": 408156, "sector": "Processed Foods"}, 
+  {"id": 523, "ticker": "DWGL.JK", "created_at": "2024-09-05 07:52:35", "price": 596, "market_cap": 5960000, "volume": 212159, "sector": "Coal"},
+  ...,
+  {"id": 530, "ticker": "TMAS.JK", "created_at": "2024-09-05 07:52:35", "price": 588, "market_cap": 5292000, "volume": 377118, "sector": "Logistics & Deliveries"}]
+  ```
+
+4. To stop the producer.py script, press `Ctrl+C` in the second terminal.
+
+Please note that if you repeatedly stop and restart the producer.py script, the first ID of the produced message will always start from 1. 
+This behavior is due to the logic in the producer.py script, where it queries the real_time_data table in the trading keyspace to retrieve the last id and increments it by 1 to 
+generate the next message. However, since we have not yet established a pipeline to load the raw transactional data into the table, the table remains empty, and the producer.py script will consistently obtain a null value for the last ID (which is treated as 0 within the script).
+
+<AccordionGroup>
+  <Accordion title="Show full code">
+    ```python producer.py
+    import random
+    import sys
+    import time
+    from datetime import datetime
+    from json import dumps
+
+    from cassandra.cluster import Cluster
+    from kafka import KafkaProducer
+    import mysql.connector
+
+    CASSANDRA_HOST = 'localhost'
+    CASSANDRA_KEYSPACE = 'trading'
+    CASSANDRA_TABLE = 'real_time_data'
+
+    MYSQL_HOST = 'localhost'
+    MYSQL_PORT = 3307
+    MYSQL_DATABASE = 'trading'
+    MYSQL_TABLE = 'profile'
+    MYSQL_USERNAME = 'root'
+    MYSQL_PASSWORD = 'root'
+
+    KAFKA_BOOTSTRAP_SERVER = 'localhost:29092'
+
+    def get_last_id():
+        cluster = Cluster([CASSANDRA_HOST])
+        session = cluster.connect(CASSANDRA_KEYSPACE)
+        query = f"SELECT MAX(id) AS last_id FROM {CASSANDRA_TABLE}"
+        result = session.execute(query)
+        last_id = result.one().last_id
+        return last_id if last_id else 0
+
+    def get_tickers():
+        config = {
+                'user': MYSQL_USERNAME,
+                'password': MYSQL_PASSWORD,
+                'host': MYSQL_HOST,
+                'port': MYSQL_PORT,
+                'database': MYSQL_DATABASE,
+                'raise_on_warnings': True
+                }
+
+        cnx = mysql.connector.connect(**config)
+
+        with cnx.cursor(dictionary=True) as c:
+            result = c.execute(f"SELECT * FROM {MYSQL_TABLE}")
+
+            rows = c.fetchall()
+
+        cnx.close()
+
+        return rows
+
+    def produce_message(id, ticker, shares, sector, min_price=500, max_price=600):
+        message = {}
+        price = random.randint(min_price, max_price)
+        message["id"] = id
+        message["ticker"] = ticker
+        message["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message['price'] = price
+        message['market_cap'] = price * shares
+        message['volume'] = random.randint(10e4, 10e5)
+        message['sector'] = sector
+        return message
+
+    def main():
+        tickers = get_tickers()
+        KAFKA_TOPIC = sys.argv[1]
+        producer = KafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP_SERVER,
+                                value_serializer=lambda x: dumps(x).encode('utf-8'))
+        last_id = get_last_id()
+        print("Kafka producer application started.")
+
+        try:
+            while True:
+                message = []
+                for ticker in tickers:
+                    id = last_id + 1
+                    message.append(produce_message(id, ticker['ticker'], ticker['shares'], ticker['sector']))
+                    last_id = id  
+                print(f"Produced message: {message}")
+                producer.send(KAFKA_TOPIC, message)
+                time.sleep(5)  
+        except KeyboardInterrupt:
+            producer.flush()
+            producer.close()
+            print("Kafka producer application completed.")
+
+    if __name__ == "__main__":
+        main()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Ingesting and Processing Transactional Data with Kafka and Spark Streaming
+
+To recap, our project directory structure should now look like this:
+
+```tree
+streaming_data_processing
+├── docker-compose.yml
+├── producer.py
+├── spark-defaults.conf
+└── spark_script
+```
+
+The `spark-defaults.conf` file is bind-mounted to the spark and spark-worker containers but is currently empty. The `spark_script` folder is bind mounted to the spark containers, but currently does not contain any files. 
+In this section, we will populate the spark-defaults.conf file with the necessary configurations and the spark_script folder with the Spark Streaming application script.
+
+First, let’s add the following configurations to the spark-defaults.conf file:
+
+``` spark-defaults.conf
+spark.jars.packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,org.apache.kafka:kafka-clients:3.4.0,com.datastax.spark:spark-cassandra-connector_2.12:3.3.0,mysql:mysql-connector-java:8.0.26
+```
+
+The above configurations specify the external dependencies that need to be downloaded and added to the Spark environment, so we can use the corresponding functionality in our Spark Streaming application. 
+Here are a brief explanation for each of the dependencies:
+
+* `org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0` – Enables Spark to use Spark Structured Streaming API when reading and writing Kafka topics.
+* `org.apache.kafka:kafka-clients:3.4.0` – Enables Spark to interact with Kafka.
+* `com.datastax.spark:spark-cassandra-connector_2.12:3.3.0` – Enables Spark to interact with Cassandra database.
+* `mysql:mysql-connector-java:8.0.26` – Enables Spark to interact with MySQL database.
+
+Next, create a new file named `data_streaming.py` in the spark_script folder. 
+Let's get started by adding the necessary imports and configurations by placing the following code inside the data_streaming.py file:
+
+```python data_streaming.py
+import signal
+import sys
+import time
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, sum, to_date, current_timestamp, from_json, explode
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType, LongType, TimestampType, ArrayType
+
+
+CASSANDRA_HOST = 'cassandra'
+CASSANDRA_PORT = 9042
+CASSANDRA_KEYSPACE = 'trading'
+CASSANDRA_TABLE = 'real_time_data'
+
+MYSQL_HOST = 'mysql'
+MYSQL_PORT = 3306
+MYSQL_DATABASE = 'trading'
+MYSQL_TABLE = 'aggregated_data'
+MYSQL_USERNAME = 'root'
+MYSQL_PASSWORD = 'root'
+
+KAFKA_BOOTSTRAP_SERVER = 'kafka:9092'
+KAFKA_TOPIC = 'trading_data'
+```
+
+The hostname for Cassandra and MySQL are based on the container names that we have defined in the docker-compose.yml file, and the ports are based on the default ports for Cassandra and MySQL. 
+For the KAFKA_BOOTSTRAP_SERVER variable, we set it to `kafka:9092` based on the `KAFKA_ADVERTISED_LISTENERS` configuration specified for the internal client in the docker-compose.yml file.
+
+Next, we define the `write_to_cassandra` function which will be used to write the raw transactional data to the Cassandra table.
+
+```python data_streaming.py
+def write_to_cassandra(df, epoch_id):
+    df.write \
+        .format("org.apache.spark.sql.cassandra") \
+        .options(keyspace=CASSANDRA_KEYSPACE, table=CASSANDRA_TABLE) \
+        .mode("append") \
+        .save()
+```
+
+The `epoch_id` parameter is required for the function passed to the `foreachBatch` method in Spark Streaming. It is used to uniquely identify each batch of data processed by Spark Streaming. 
+We set the mode to `append` because we want to append the data to the existing data in the Cassandra table.
+
+Next, we define the `write_to_mysql` function which will be used to write the aggregated data to the MySQL table.
+
+```python data_streaming.py
+def write_to_mysql(df, epoch_id):
+    agg_df = df.withColumn("date", to_date(col("created_at"))) \
+        .groupBy("date", "sector") \
+        .agg(sum("volume").alias("total_volume")) \
+        .withColumn("processed_at", current_timestamp())
+
+    agg_df.write \
+        .jdbc(url=f"jdbc:mysql://{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}", 
+                table=MYSQL_TABLE, 
+                mode="append", 
+                properties= {
+                    "driver": "com.mysql.cj.jdbc.Driver",
+                    "user": MYSQL_USERNAME,
+                    "password": MYSQL_PASSWORD}) 
+```
+
+To create the aggregated dataframe, we first convert the `created_at` column (which contains the date and time) to a `date` column (which contains only the date) using the `to_date` function. 
+Then, we aggregate the `volume` data and determine the total volume of all traded stocks within that specific microbatch, by grouping the data based on the `date` and `sector`. 
+Note that we include the `date` column in the group by clause to ensure that data from different day are not aggregated together. This might not be relevant to Indonesian Stock Market where the market 
+is not always open, but we'll keep it there to ensure a correct aggregation. We also add a `processed_at` column to the aggregated dataframe to indicate the time when the data is processed, using the current_timestamp function which by default returns the current time in UTC timezone. 
+Finally the aggregated dataframe is written to the MySQL table using the `write.jdbc` method.
+
+Next, we define the `signal_handler` function which handle the interruption signal received by the application.
+
+```python data_streaming.py
+def signal_handler(signal, frame):
+    print("Waiting for 90 seconds before terminating the Spark Streaming application...")
+    time.sleep(90)
+    sys.exit(0)
+```
+
+The objective of this function is to add a delay before terminating the Spark Streaming application. It provides a grace period for any ongoing processing or cleanup tasks before the application is terminated. 
+We set the delay period to 90 seconds, slightly longer than the microbatch interval of `write_to_mysql`, which we will later set to 60 seconds.
+
+Finally, we define the `main` function which will be used to define the Spark Streaming application.
+
+```python data_streaming.py
+def main():
+    spark = SparkSession.builder \
+        .appName("Spark-Kafka-Cassandra-MySQL") \
+        .config("spark.cassandra.connection.host", CASSANDRA_HOST) \
+        .config("spark.cassandra.connection.port", CASSANDRA_PORT) \
+        .getOrCreate()
+
+    spark.sparkContext.setLogLevel("ERROR")
+    ...
+```
+The first part of the main function is used to define the Spark session. We set the application name to `Spark-Kafka-Cassandra-MySQL` and configure the Cassandra host and port. 
+Then, we set the log level to `ERROR` to reduce the amount of logs generated to the console.
+
+```python data_streaming.py
+def main():
+    ...
+
+    df = spark \
+        .readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER) \
+        .option("subscribe", KAFKA_TOPIC) \
+        .option("startingOffsets", "latest") \
+        .load()
+
+    schema = ArrayType(StructType([
+        StructField("id", IntegerType(), True),
+        StructField("ticker", StringType(), True),
+        StructField("created_at", StringType(), True),
+        StructField("price", IntegerType(), True),
+        StructField("market_cap", LongType(), True),
+        StructField("volume", LongType(), True),
+        StructField("sector", StringType(), True)
+    ]))
+
+    df = df.selectExpr("CAST(value AS STRING) as json_data")
+    df = df.withColumn("data", from_json(col("json_data"), schema))
+    df_exploded = df.select(explode(col("data")).alias("exploded_data"))
+    tmp_df = df_exploded.select("exploded_data.*")
+    tmp_df = tmp_df.withColumn("created_at", col("created_at").cast(TimestampType()))
+
+    ...
+```
+The first chunk of code aims to subscribe from Kafka to the specific topic we have set earlier, then continously captures new messages as they arrive. 
+Remember that we have 10 data (1 from each symbol), which is streamed as one message with a shape of array of JSON objects. To correctly load the data, we define a `schema`.
+Last, we read the data as string, convert it into JSON, then explode it to flatten the array of JSON objects into individual rows.
+
+```python data_streaming.py
+def main():
+    ...
+
+    tmp_df.writeStream \
+        .foreachBatch(write_to_cassandra) \
+        .outputMode("append") \
+        .trigger(processingTime='10 seconds') \
+        .start() 
+
+    tmp_df.writeStream \
+        .foreachBatch(write_to_mysql) \
+        .outputMode("append") \
+        .trigger(processingTime='60 seconds') \
+        .start() 
+    
+    ...
+```
+
+In the next part of the main function, we define the two streaming queries by using the `writeStream` method. 
+The first query responsible for writing the raw transactional data to the Cassandra table, while the second query is responsible for writing the aggregated data to the MySQL table.
+
+For the first query, we use the `write_to_cassandra` function as the processing logic within the `foreachBatch` method. 
+The outputMode is set to `append`, which means that only the newly generated rows since the last trigger will be written to the sink (Cassandra table). 
+The trigger is set to a processing time interval of 10 seconds, which determines the frequency at which microbatches are processed. 
+Note that the lowest limit for the trigger interval is 100 milliseconds, however we should consider the underlying infrastructure and capabilities of the system/cluster as well.
+
+Simiarly, for the second query, we use the `write_to_mysql` function as the processing logic within the `foreachBatch` method. 
+The outputMode is also set to `append`. The trigger is set to a longer processing time interval of 60 seconds, because we want to accumulate more data before performing the aggregation.
+
+```python data_streaming.py
+def main():
+    ...
+
+    signal.signal(signal.SIGINT, signal_handler)
+    spark.streams.awaitAnyTermination()
+```
+
+In the last part of the main function, we register a signal handler for the SIGINT signal using the `signal.signal` function. 
+This allows us to capture the interrupt signal (Ctrl+C) and perform any neccessary additional processing before terminating the application. 
+Finally, we call the `awaitAnyTermination` method on the SparkSession streams to ensure that the application continues to run and process data until it is explicitly terminated or encounters an error. 
+Without this method, the program would reach the end of the script and terminate immediately, without giving the streaming queries a chance to process any data.
+
+Now, let’s open a new terminal and run the Spark Streaming application inside the spark container:
+
+```bash
+docker exec -it spark bash
+python /spark_script/data_streaming.py
+```
+
+Wait until all the dependencies are installed sucesfully and you should see the following text in the terminal:
+
+```bash
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+```
+
+Next, open another terminal and run the `producer.py` script in the host machine to produce messages to the trading_data topic:
+
+```bash
+python producer.py trading_data
+```
+
+Let the producer script to run for around 15-30 seconds, then open another terminal to check if the data has been successfully written to Cassandra:
+
+```bash
+docker exec -it cassandra bash
+cqlsh
+```
+
+```cql
+USE trading;
+SELECT * FROM real_time_data;
+```
+
+If the data is successfully written to Cassandra, you should see an output similar to the following:
+
+|    id    |           created_at            | ticker  |         sector           | volume | market_cap | price |
+|----------|---------------------------------|---------|--------------------------|--------|------------|-------|
+|    1     | 2024-08-25 07:04:45.000000+0000 | TMAS.JK | Logistics & Deliveries   | 275674 |   4932000  |  550  |
+|    2     | 2024-08-25 07:04:45.000000+0000 | DWGL.JK | Coal                     | 334567 |   593844   |  540  |
+|    3     | 2024-08-25 07:04:45.000000+0000 | ALTO.JK | Beverages                | 132423 |   5642123  |  600  |
+
+And after around one minute, we can also check if the data has been successfully written to MySQL. Open another terminal and run the following commands:
+
+```bash
+docker exec -it mysql bash
+mysql -u root -p
+```
+
+Enter the password root when prompted (as specified in the `docker-compose.yml` file). Then run the following commands:
+
+```sql
+USE trading;
+SELECT * from aggregated_data;
+```
+
+If the data is successfully written to MySQL, you should see an output similar to the following:
+
+| processing_id |           processed_at          |        sector           | total_volume |    date     |
+|---------------|---------------------------------|-------------------------|--------------|-------------|
+|    1          | 2024-08-25 07:04:45.000000+0000 | Logistics & Deliveries  | 275674123    |  2024-08-25 |
+|    2          | 2024-08-25 07:04:45.000000+0000 | Coal                    | 334561247    |  2024-08-25 |
+|    3          | 2024-08-25 07:04:45.000000+0000 | Beverages               | 132423566    |  2024-08-25 |
+
+You can keep the producer.py script and the Spark Streaming application running to continuously produce and process the data stream. To stop the operation, plaese follow the steps below.
+
+1. Go to the terminal running the producer.py script and press Ctrl + C to stop the producer application.
+2. After the producer application has been stopped, go to the terminal running the Spark Streaming application and press Ctrl + C to terminate the application. Note that the Spark Streaming application will wait around 90 seconds before it terminates.
+
+By following the steps above, you ensure that all the data produced by the producer application are ingested and processed by the Spark Streaming application.
+
+Up to this section, we have covered the steps involved in producing and consuming messages within a topic using Kafka. 
+Additionally, we have successfully implemented a data pipeline that leverages Kafka and Spark Streaming to ingest and process transactional data streams. 
+The processed data is then loaded into both OLTP and OLAP databases, enabling (near) real-time data processing and insightful analytics.
