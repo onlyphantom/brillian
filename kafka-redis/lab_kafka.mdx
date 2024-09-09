@@ -1049,3 +1049,273 @@ By following the steps above, you ensure that all the data produced by the produ
 Up to this section, we have covered the steps involved in producing and consuming messages within a topic using Kafka. 
 Additionally, we have successfully implemented a data pipeline that leverages Kafka and Spark Streaming to ingest and process transactional data streams. 
 The processed data is then loaded into both OLTP and OLAP databases, enabling (near) real-time data processing and insightful analytics.
+
+## Visualizing Data into Streamlit
+<CardGroup cols={1}>
+  <Card icon="youtube" title="Altair" href="https://www.youtube.com/watch?v=umTwkgQoo_E&list=PLXsFtK46HZxXBddVC0FqmbGdlvbDbaqzx&ab_channel=SamuelChan">
+    A basic understanding of Altair will be helpful.
+  </Card>
+</CardGroup>
+
+In this final section of the lab, we will dive into the analytical aspect by performing insightful query on the aggregated transactional data stored in the MySQL database. 
+Additionally, we will create a simple (near) real-time dashboard to visualize the our data. By combining analytics and visualization, we can easily explore and interpret the data, enabling us to monitor the performance of the business and make data-driven decisions.
+
+We will create our dashboard using Streamlit, which is an open-source Python library to build custom web apps. Streamlit is a great tool for quickly building and sharing data applications, and it is quite straightforward to use due to its extensive documentation and intuitive API. 
+In addition to Streamlit, we will utilize Altair, a powerful visualization library, to create interactive and visually appealing charts within our dashboard.
+
+### Data Analysis
+
+Now, let’s begin our data analysis. To facilitate the analysis process, we will utilize `view` in MySQL. 
+View is a virtual table that is derived from the result of a query. It does not store any data, but rather, it is a stored query that can be treated as a table. 
+View is an excellent choice for our needs as they allow us to reuse the same query multiple times without having to rewrite the query each time. 
+
+We will create a view named `volume_today` that contains the total trading volume across different sectors on the current day.
+
+```sql
+CREATE VIEW volume_today AS
+  select ad.sector AS sector,
+        sum(ad.total_volume) AS total_volume
+  from aggregated_data ad 
+  where ad.date = curdate() 
+  group by ad.sector
+```
+
+You can access the views we have created similar to how you would access a table. So to access the volume_today view, simply execute the following command:
+```sql
+SELECT * FROM volume_today;
+
+You should see an output similar to the following:
+
+```
+| sector                 | total_volume |
+|------------------------|--------------|
+| Machinery              |     86189937 |
+| Healthcare Providers   |     42701507 |
+| Coal                   |     42613419 |
+| Beverages              |     40638827 |
+| Logistics & Deliveries |     43049845 |
+| Construction Materials |     38948489 |
+| Commercial Services    |     40920640 |
+| Chemicals              |     43433985 |
+| Processed Foods        |     40158486 |
+
+Note that by keeping the producer.py script and the Spark Streaming application running (refer to the previous section), 
+our data are processed in a streaming manner. Consequently, the result of volume_today view will be continuously updated as new data is ingested, processed, and loaded into the aggregated_data table. 
+This allows us to perform (near) real-time analysis, where insights and conclusions can be derived from the most up-to-date data available.
+
+Now that we have created the view, we can proceed to visualize the data. In the next step, we will demonstrate the process of building a (near) real-time dashboard using Streamlit and Altair. By utilizing these tools, we can effectively present the data in a visually appealing and interactive manner.
+
+### Streamlit & Altair
+
+Before we dive in, there are some additional packages that we need to install in your current **virtual environment**:
+
+```bash
+pip install streamlit altair pandas
+```
+
+Next, we’ll proceed with the creation of the necessary files and folders in the project directory. We will start by creating a new folder called `dashboard`. 
+Inside the dashboard folder, we’ll create a file named `app.py` which will contain the code for our Streamlit application. 
+Additionally, we need to create a subfolder within dashboard called `.streamlit`. This subfolder will house a configuration file named `secrets.toml` for our Streamlit application. 
+You can accomplish this either through the user interface or by executing the following commands in your project directory:
+
+```bash
+mkdir dashboard
+cd dashboard
+touch app.py
+mkdir .streamlit
+cd .streamlit
+touch secrets.toml
+```
+
+By executing these commands, you will successfully create the required files and folders in your project directory. And now, your project directory should look like this:
+
+```tree
+streaming_data_processing
+├── docker-compose.yml
+├── producer.py
+├── spark-defaults.conf
+├── dashboard
+│   ├── app.py
+│   └── .streamlit
+│       └── secrets.toml
+└── spark_script
+    └── data_streaming.py
+```
+
+Next, let's populate the `secrets.toml` file with the credentials required to connect with the database.
+
+```yaml secrets.toml
+[cassandra]
+CASSANDRA_HOST = "localhost"
+CASSANDRA_KEYSPACE = "trading"
+CASSANDRA_TABLE = "real_time_data"
+
+[mysql]
+MYSQL_HOST = "localhost"
+MYSQL_PORT = "3307"
+MYSQL_DATABASE = "trading"
+MYSQL_USERNAME = "root"
+MYSQL_PASSWORD = "root"
+```
+
+Now, we can proceed with the implementation of the dashboard in the Streamlit application. Open the `app.py` file and add the following lines:
+
+```python dashboard/app.py
+import datetime as dt
+import time
+
+import altair as alt
+import pandas as pd
+import streamlit as st
+
+from cassandra.cluster import Cluster
+import mysql.connector
+
+CASSANDRA_HOST = st.secrets["cassandra"]["CASSANDRA_HOST"]
+CASSANDRA_KEYSPACE = st.secrets["cassandra"]["CASSANDRA_KEYSPACE"]
+CASSANDRA_TABLE = st.secrets["cassandra"]["CASSANDRA_TABLE"]
+
+MYSQL_HOST = st.secrets["mysql"]["MYSQL_HOST"]
+MYSQL_PORT = st.secrets["mysql"]["MYSQL_PORT"]
+MYSQL_DATABASE = st.secrets["mysql"]["MYSQL_DATABASE"]
+MYSQL_USERNAME = st.secrets["mysql"]["MYSQL_USERNAME"]
+MYSQL_PASSWORD = st.secrets["mysql"]["MYSQL_PASSWORD"]
+
+st.set_page_config(layout='wide', page_title='Brillian Stock Dashboard')
+```
+
+We begin by importing all the ncessary packages and load the environment variables to the necessary configurations, which we earlier defined in `secrets.toml`.
+Then, we set the page configuration for our Streamlit application, including the layout and the page title shown in the browser tab.
+
+Next, we define a function called `get_view_data` that takes in the name of a view as an argument and returns the data in the view as a dataframe. We also define 
+`get_raw_data` which returns the raw transactional data we store in Cassandra.
+
+```python
+@st.cache_data(ttl=60)
+def get_view_data(view_name):
+    # Connect to the database and retrieve the view data in a dataframe
+    config = {
+        'user': MYSQL_USERNAME,
+        'password': MYSQL_PASSWORD,
+        'host': MYSQL_HOST,
+        'port': MYSQL_PORT,
+        'database': MYSQL_DATABASE,
+        'raise_on_warnings': True
+        }
+
+    cnx = mysql.connector.connect(**config)
+
+    with cnx.cursor(dictionary=True) as c:
+        result = c.execute(f"SELECT * FROM {view_name}")
+
+        rows = c.fetchall()
+
+    cnx.close()
+
+    return pd.DataFrame(rows)
+
+@st.cache_data(ttl=15)
+def get_raw_data():
+    cluster = Cluster([CASSANDRA_HOST])
+    session = cluster.connect(CASSANDRA_KEYSPACE)
+    query = f"SELECT * FROM {CASSANDRA_TABLE}"
+    result = session.execute(query)
+    result = pd.DataFrame(result)
+    return result.sort_values('created_at')
+```
+
+Once the connection is established, the first function executes a query to retrieve all the data from the specified view. 
+The `ttl` argument specifies the duration for which the query results will be cached. Since our microbatch processing interval for the aggregated data is 60 seconds, 
+we set the ttl to 60 seconds as well, indicating that the query results will be cached for 60 seconds before a new query is executed. On the other hand, the second function executes 
+a query to retrieve all the data from our transactional table in Cassandra. Feel free to adjust these functions as needed, you can even further optimize them by specifying a `WHERE` clause to avoid 
+retrieving all data at once.
+
+```python
+view_df = get_view_data('volume_today')
+view_df['total_volume'] = view_df['total_volume'].astype(int)
+
+bar_chart = alt.Chart(view_df).mark_bar(color="cyan").encode(
+            x=alt.X("total_volume", axis=alt.Axis(title="Volume")),
+            y = alt.Y('sector', sort='-x', axis=alt.Axis(title=None))
+        ).properties(title="Top Volume by Sector", width=1200, height=400)
+
+price_df = get_raw_data()
+price_df = price_df.tail(10*5)
+
+line_chart = alt.Chart(price_df).mark_line().encode(
+    x="created_at:T",
+    y=alt.Y("price:Q", scale=alt.Scale(domain=[500, 600])),
+    color="ticker:N"
+).properties(title="Historical Price Movement", width=1200, height=400)
+```
+
+Here is the breakdown of the code to generate the bar chart using Altair:
+
+* The `alt.Chart` function creates a base chart object.
+* The `mark_bar(color=color)` indicates that the chart is a bar chart with the specified color.
+* The `encode` function is used to specify the x and y axes of the chart:
+  1. The `x-axis` is mapped to the `total_volume`. The title of the x-axis is set to **Volume**.
+  2. The `y-axis` is mapped to the `sector`. The sort argument is set to ‘-x’ to sort the y-axis in descending order. The title of the y-axis is set to None.
+* The properties function is used to specify the height, width and title of the chart.
+
+Generating the line chart is also relatively similar, except here we can set the scale of y-axis by defining `scale=alt.Scale()`.
+
+```python
+today = dt.date.today().strftime("%Y-%m-%d")
+title = f"Brilian Stock Dashboard: {today}"
+st.header(title)
+
+st.altair_chart(bar_chart)
+
+st.altair_chart(line_chart)
+```
+
+Putting everything together, we set the dashboard title using `st.header`, which includes the current date. This title is positioned at the top of the dashboard.
+Afterwards, we can then display the plots based on the order we would like to display by calling `st.altair_chart()`.
+
+Now, let’s run the Streamlit app and see the dashboard in action. Execute the following command in the project directory:
+
+```bash
+cd dashboard
+streamlit run app.py
+```
+
+You should see an output similar to the following:
+
+```bash
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://172.16.0.2:8501
+```
+
+To access the Streamlit app, simply copy the Network URL and paste it into your browser. You should see a dashboard similar to the one below in your browser:
+
+![Dasboard Preview](../images/kafka/lab-kafka-preview.png)
+
+As our Kafka Producer and Spark Streaming application keep on running, the data and view in our databases are also being updated continuously. Currently, these updates are not being 
+reflected in our dashboard. To allow for automatic updates, let's add this final piece of code:
+
+```python
+time.sleep(15)
+st.rerun()
+```
+
+If you are done with exploring the dashboard, you can stop the Streamlit app by pressing Ctrl + C in the terminal. And if you are done with the project, you can stop the Docker containers by running the following command in the project directory:
+
+```bash
+docker compose stop
+```
+## Exercise (10 points)
+1. **Objective**: Have more proficiency on Kafka and Streamlit.
+2. **Task**: Get as creative as you want and add more tables and visualizations by following the steps we have followed through in this lab.
+
+## Summary
+In the first section, we have discussed the project overview set up the project environment by utilizing Docker Compose. Next, we have implemented an OLTP database using Cassandra and an OLAP database using MySQL, 
+highlighting how a user or an organization can leverage the strengths of both SQL and NoSQL databases in their streams. The OLTP database is used to store the raw transactional data, while the OLAP database is used to store the aggregated data.
+As the highlight and core component of this lab, we then developed a data pipeline that utilizes Kafka and Spark Streaming to ingest and process transactional data streams. The processed data is subsequently loaded into the OLTP and OLAP databases.
+Lastly, in the last section, we conducted data analysis on the aggregated transactional data stored in the OLAP (MySQL) database and developed an interactive and dynamic dashboard using Streamlit. 
+This dashboard allows users to visualize and analyze the total volume data per each sector, indicating the current money flow in the stock market, in a (near) real-time manner.
+
+### References
+1. [Streaming Data Pipeline: The Full Cycle](https://supertype.ai/streaming-data-pipeline/)
