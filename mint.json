@@ -73,6 +73,12 @@
       ]
     },
     {
+      "group": "Case Studies of Enterprise AI",
+      "pages": [
+        "case-study/ai_for_rail_transportation"
+      ]
+    },
+    {
       "group": "Final Project",
       "pages": [
         "final-project/django-route",
